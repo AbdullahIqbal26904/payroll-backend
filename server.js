@@ -2,7 +2,6 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const dotenv = require('dotenv');
-const { initializeDatabase } = require('./config/initDb');
 const db = require('./config/db');
 
 // Import routes
@@ -51,8 +50,6 @@ app.use((err, req, res, next) => {
 // Initialize database and start the server
 (async () => {
   try {
-    // Initialize database with tables and default data
-    await initializeDatabase();
     
     // Start the server
     app.listen(PORT, () => {
