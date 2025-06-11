@@ -1,0 +1,288 @@
+[{
+  "name": "Upload Timesheet",
+  "request": {
+    "method": "POST",
+    "header": [
+      {
+        "key": "Authorization",
+        "value": "Bearer {{token}}"
+      }
+    ],
+    "body": {
+      "mode": "formdata",
+      "formdata": [
+        {
+          "key": "file",
+          "type": "file",
+          "src": "/path/to/sample_timesheet.csv"
+        }
+      ]
+    },
+    "url": {
+      "raw": "{{baseUrl}}/api/payroll/upload-timesheet",
+      "host": [
+        "{{baseUrl}}"
+      ],
+      "path": [
+        "api",
+        "payroll",
+        "upload-timesheet"
+      ]
+    },
+    "description": "Upload timesheet CSV file for processing"
+  },
+  "response": []
+},
+{
+  "name": "Get Timesheet Periods",
+  "request": {
+    "method": "GET",
+    "header": [
+      {
+        "key": "Authorization",
+        "value": "Bearer {{token}}"
+      }
+    ],
+    "url": {
+      "raw": "{{baseUrl}}/api/payroll/timesheet-periods",
+      "host": [
+        "{{baseUrl}}"
+      ],
+      "path": [
+        "api",
+        "payroll",
+        "timesheet-periods"
+      ]
+    },
+    "description": "Get all timesheet periods"
+  },
+  "response": []
+},
+{
+  "name": "Get Timesheet Period Details",
+  "request": {
+    "method": "GET",
+    "header": [
+      {
+        "key": "Authorization",
+        "value": "Bearer {{token}}"
+      }
+    ],
+    "url": {
+      "raw": "{{baseUrl}}/api/payroll/timesheet-periods/1",
+      "host": [
+        "{{baseUrl}}"
+      ],
+      "path": [
+        "api",
+        "payroll",
+        "timesheet-periods",
+        "1"
+      ]
+    },
+    "description": "Get details of a specific timesheet period"
+  },
+  "response": []
+},
+{
+  "name": "Calculate Payroll",
+  "request": {
+    "method": "POST",
+    "header": [
+      {
+        "key": "Authorization",
+        "value": "Bearer {{token}}"
+      },
+      {
+        "key": "Content-Type",
+        "value": "application/json"
+      }
+    ],
+    "body": {
+      "mode": "raw",
+      "raw": "{\n    \"periodId\": 1,\n    \"payDate\": \"2025-06-15\",\n    \"paymentFrequency\": \"Bi-Weekly\"\n}"
+    },
+    "url": {
+      "raw": "{{baseUrl}}/api/payroll/calculate",
+      "host": [
+        "{{baseUrl}}"
+      ],
+      "path": [
+        "api",
+        "payroll",
+        "calculate"
+      ]
+    },
+    "description": "Calculate payroll for a specific timesheet period"
+  },
+  "response": []
+},
+{
+  "name": "Get Payroll Reports",
+  "request": {
+    "method": "GET",
+    "header": [
+      {
+        "key": "Authorization",
+        "value": "Bearer {{token}}"
+      }
+    ],
+    "url": {
+      "raw": "{{baseUrl}}/api/payroll/reports",
+      "host": [
+        "{{baseUrl}}"
+      ],
+      "path": [
+        "api",
+        "payroll",
+        "reports"
+      ]
+    },
+    "description": "Get all payroll reports"
+  },
+  "response": []
+},
+{
+  "name": "Get Payroll Report Details",
+  "request": {
+    "method": "GET",
+    "header": [
+      {
+        "key": "Authorization",
+        "value": "Bearer {{token}}"
+      }
+    ],
+    "url": {
+      "raw": "{{baseUrl}}/api/payroll/reports/1",
+      "host": [
+        "{{baseUrl}}"
+      ],
+      "path": [
+        "api",
+        "payroll",
+        "reports",
+        "1"
+      ]
+    },
+    "description": "Get details for a specific payroll report"
+  },
+  "response": []
+},
+{
+  "name": "Download Employee Paystub",
+  "request": {
+    "method": "GET",
+    "header": [
+      {
+        "key": "Authorization",
+        "value": "Bearer {{token}}"
+      }
+    ],
+    "url": {
+      "raw": "{{baseUrl}}/api/payroll/paystub/1/1",
+      "host": [
+        "{{baseUrl}}"
+      ],
+      "path": [
+        "api",
+        "payroll",
+        "paystub",
+        "1",
+        "1"
+      ]
+    },
+    "description": "Download a PDF paystub for an employee"
+  },
+  "response": []
+},
+{
+  "name": "Email Paystubs to Employees",
+  "request": {
+    "method": "POST",
+    "header": [
+      {
+        "key": "Authorization",
+        "value": "Bearer {{token}}"
+      },
+      {
+        "key": "Content-Type",
+        "value": "application/json"
+      }
+    ],
+    "body": {
+      "mode": "raw",
+      "raw": "{\n    \"payrollRunId\": 1,\n    \"sendToAll\": true,\n    \"employeeIds\": []\n}"
+    },
+    "url": {
+      "raw": "{{baseUrl}}/api/payroll/email-paystubs",
+      "host": [
+        "{{baseUrl}}"
+      ],
+      "path": [
+        "api",
+        "payroll",
+        "email-paystubs"
+      ]
+    },
+    "description": "Send paystubs via email to employees"
+  },
+  "response": []
+},
+{
+  "name": "Get Payroll Settings",
+  "request": {
+    "method": "GET",
+    "header": [
+      {
+        "key": "Authorization",
+        "value": "Bearer {{token}}"
+      }
+    ],
+    "url": {
+      "raw": "{{baseUrl}}/api/payroll/settings",
+      "host": [
+        "{{baseUrl}}"
+      ],
+      "path": [
+        "api",
+        "payroll",
+        "settings"
+      ]
+    },
+    "description": "Get payroll settings for Antigua"
+  },
+  "response": []
+},
+{
+  "name": "Update Payroll Settings",
+  "request": {
+    "method": "PUT",
+    "header": [
+      {
+        "key": "Authorization",
+        "value": "Bearer {{token}}"
+      },
+      {
+        "key": "Content-Type",
+        "value": "application/json"
+      }
+    ],
+    "body": {
+      "mode": "raw",
+      "raw": "{\n    \"socialSecurityEmployeeRate\": 7.00,\n    \"socialSecurityEmployerRate\": 9.00,\n    \"socialSecurityMaxInsurable\": 6500.00,\n    \"medicalBenefitsEmployeeRate\": 3.50,\n    \"medicalBenefitsEmployerRate\": 3.50,\n    \"medicalBenefitsEmployeeSeniorRate\": 2.50,\n    \"educationLevyRate\": 2.50,\n    \"educationLevyHighRate\": 5.00,\n    \"educationLevyThreshold\": 5000.00,\n    \"educationLevyExemption\": 541.67,\n    \"retirementAge\": 65,\n    \"medicalBenefitsSeniorAge\": 60,\n    \"medicalBenefitsMaxAge\": 70\n}"
+    },
+    "url": {
+      "raw": "{{baseUrl}}/api/payroll/settings",
+      "host": [
+        "{{baseUrl}}"
+      ],
+      "path": [
+        "api",
+        "payroll",
+        "settings"
+      ]
+    },
+    "description": "Update payroll settings for Antigua"
+  },
+  "response": []
+}]

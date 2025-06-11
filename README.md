@@ -1,6 +1,17 @@
-# Payroll System Backend API
+# MSA Payroll System Backend API
 
-This is the backend API for MSA Payroll System developed specifically for Antiqua. It handles authentication, employee management, and payroll processing.
+This is the backend API for MSA Payroll System developed specifically for Antigua. It handles authentication, employee management, timesheet processing, and payroll calculations.
+
+## Phase 2 Update
+
+Phase 2 has been implemented with the following features:
+- Punch report CSV import in the Attend Time Clock format
+- Antigua-specific payroll calculations:
+  - Social Security (7% employee, 9% employer, capped at $6,500 insurable earnings)
+  - Medical Benefits (3.5% standard rate, reduced rates for seniors)
+  - Education Levy (tiered rates based on salary thresholds)
+- PDF paystub generation
+- Email delivery of paystubs to employees
 
 ## Setup
 
@@ -15,8 +26,14 @@ This is the backend API for MSA Payroll System developed specifically for Antiqu
    DB_NAME=payroll_system
    JWT_SECRET=your_jwt_secret
    JWT_EXPIRE=7d
+   EMAIL_HOST=smtp.example.com
+   EMAIL_PORT=587
+   EMAIL_USER=your_email@example.com
+   EMAIL_PASSWORD=your_email_password
+   EMAIL_SECURE=false
    ```
-4. Start the server:
+4. Run the database migrations: `./migrate.sh`
+5. Start the server:
    - Development mode: `npm run dev`
    - Production mode: `npm start`
 
@@ -49,6 +66,36 @@ A Postman collection is included at the root of the project (`Payroll_System_API
 | PUT | `/api/users/:id` | Update user |
 | DELETE | `/api/users/:id` | Delete user |
 | POST | `/api/users/:id/reset-password` | Reset user's password |
+
+### Employee Management
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/employees` | Get all employees |
+| POST | `/api/employees` | Create a new employee |
+| GET | `/api/employees/:id` | Get a single employee |
+| PUT | `/api/employees/:id` | Update employee |
+| DELETE | `/api/employees/:id` | Delete employee |
+
+### Timesheet Management (Phase 2)
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/payroll/upload-timesheet` | Upload and process timesheet CSV |
+| GET | `/api/payroll/timesheet-periods` | Get all timesheet periods |
+| GET | `/api/payroll/timesheet-periods/:id` | Get timesheet period details |
+
+### Payroll Management (Phase 2)
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/payroll/calculate` | Calculate payroll for a period |
+| GET | `/api/payroll/reports` | Get all payroll reports |
+| GET | `/api/payroll/reports/:id` | Get payroll report details |
+| GET | `/api/payroll/paystub/:payrollRunId/:employeeId` | Download employee paystub PDF |
+| POST | `/api/payroll/email-paystubs` | Email paystubs to employees |
+| GET | `/api/payroll/settings` | Get payroll settings |
+| PUT | `/api/payroll/settings` | Update payroll settings |
 
 ### Employee Management (Admin only)
 

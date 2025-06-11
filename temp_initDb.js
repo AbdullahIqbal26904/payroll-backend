@@ -56,7 +56,82 @@ async function initializeDatabase() {
       )
     `);
     
-    // Create payroll table
+    // Create timesheet periods table
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS timesheet_periods (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        report_title VARCHAR(255),
+        period_start DATE,
+        period_end DATE,
+        status ENUM('pending', 'processed', 'finalized') DEFAULT 'pending',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        created_by INT,
+        FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
+      )
+    `);
+    
+    // Create timesheet entries table
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS timesheet_entries (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        period_id INT,
+        employee_id VARCHAR(50) NULL,
+        last_name VARCHAR(100) NOT NULL,
+        first_name VARCHAR(100) NOT NULL,
+        work_date DATE,
+        time_in VARCHAR(20),
+        time_out VARCHAR(20),
+        total_hours VARCHAR(20),
+        dept_code VARCHAR(20),
+        in_location VARCHAR(100),
+        in_punch_method VARCHAR(50),
+        out_location VARCHAR(100),
+        out_punch_method VARCHAR(50),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (period_id) REFERENCES timesheet_periods(id) ON DELETE CASCADE
+      )
+    `);
+    
+    // Create payroll runs table
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS payroll_runs (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        period_id INT,
+        pay_date DATE,
+        status ENUM('processing', 'completed', 'completed_with_errors', 'finalized') DEFAULT 'processing',
+        total_employees INT DEFAULT 0,
+        total_gross DECIMAL(12, 2) DEFAULT 0.00,
+        total_net DECIMAL(12, 2) DEFAULT 0.00,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        created_by INT,
+        FOREIGN KEY (period_id) REFERENCES timesheet_periods(id) ON DELETE CASCADE,
+        FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
+      )
+    `);
+    
+    // Create payroll items table for individual employee calculations
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS payroll_items (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        payroll_run_id INT,
+        employee_id INT NULL,
+        employee_name VARCHAR(200) NOT NULL,
+        hours_worked DECIMAL(8, 2) DEFAULT 0.00,
+        gross_pay DECIMAL(10, 2) DEFAULT 0.00,
+        social_security_employee DECIMAL(10, 2) DEFAULT 0.00,
+        social_security_employer DECIMAL(10, 2) DEFAULT 0.00,
+        medical_benefits_employee DECIMAL(10, 2) DEFAULT 0.00,
+        medical_benefits_employer DECIMAL(10, 2) DEFAULT 0.00,
+        education_levy DECIMAL(10, 2) DEFAULT 0.00,
+        net_pay DECIMAL(10, 2) DEFAULT 0.00,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (payroll_run_id) REFERENCES payroll_runs(id) ON DELETE CASCADE,
+        FOREIGN KEY (employee_id) REFERENCES employees(id) ON DELETE SET NULL
+      )
+    `);
+    
+    // Create old payroll table (keeping for backward compatibility)
     await connection.query(`
       CREATE TABLE IF NOT EXISTS payrolls (
         id INT AUTO_INCREMENT PRIMARY KEY,

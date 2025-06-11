@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Your Paystub</title>
+  <style>
+    body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+    .container { width: 100%; max-width: 600px; margin: 0 auto; }
+    .header { background-color: #003366; padding: 20px; text-align: center; color: white; }
+    .content { padding: 20px; background-color: #f8f9fa; }
+    .footer { font-size: 12px; text-align: center; margin-top: 30px; color: #777; padding: 10px; }
+    .important { color: #003366; font-weight: bold; }
+    table { width: 100%; border-collapse: collapse; margin: 15px 0; }
+    table th, table td { padding: 8px; text-align: left; border-bottom: 1px solid #ddd; }
+    table th { background-color: #f2f2f2; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h2>MSA Payroll System - Antigua</h2>
+    </div>
+    <div class="content">
+      <p>Dear <%= employeeName %>,</p>
+      <p>Please find attached your paystub for the period <span class="important"><%= periodStart %> to <%= periodEnd %></span>.</p>
+      
+      <h3>Payment Summary</h3>
+      <table>
+        <tr>
+          <th>Item</th>
+          <th>Amount</th>
+        </tr>
+        <tr>
+          <td>Pay Date</td>
+          <td><%= payDate %></td>
+        </tr>
+        <tr>
+          <td>Gross Pay</td>
+          <td>$<%= grossPay.toFixed(2) %></td>
+        </tr>
+        <tr>
+          <td>Net Pay</td>
+          <td>$<%= netPay.toFixed(2) %></td>
+        </tr>
+      </table>
+      
+      <p>Your complete paystub with detailed deductions is attached to this email as a PDF document.</p>
+      <p>If you have any questions regarding your paystub, please contact the payroll department.</p>
+      <p>Thank you,</p>
+      <p>MSA Payroll Team</p>
+    </div>
+    <div class="footer">
+      <p>This is an automated email. Please do not reply to this message.</p>
+      <p>MSA Payroll System &copy; <%= new Date().getFullYear() %></p>
+    </div>
+  </div>
+</body>
+</html>
