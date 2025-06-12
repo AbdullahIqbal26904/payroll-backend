@@ -28,7 +28,9 @@ fi
 # Function to handle migrations
 run_migrations() {
   echo "Running migrations..."
-  node migrations/run.js "$@"
+  # Use the script's directory to ensure proper path resolution
+  SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
+  node "${SCRIPT_DIR}/run.js" "$@"
   
   if [ $? -eq 0 ]; then
     echo "Migrations completed successfully."
