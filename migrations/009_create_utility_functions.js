@@ -19,10 +19,12 @@ async function up(connection) {
       DROP FUNCTION IF EXISTS CONVERT_TIME_TO_DECIMAL;
     `);
     
+    // Adding NO SQL attribute to avoid requiring SUPER privileges
     await connection.query(`
       CREATE FUNCTION CONVERT_TIME_TO_DECIMAL(time_str VARCHAR(20))
       RETURNS DECIMAL(10,2)
       DETERMINISTIC
+      NO SQL
       BEGIN
         DECLARE hours DECIMAL(10,2) DEFAULT 0;
         DECLARE minutes DECIMAL(10,2) DEFAULT 0;
@@ -47,10 +49,12 @@ async function up(connection) {
       DROP FUNCTION IF EXISTS CALCULATE_AGE;
     `);
     
+    // Adding NO SQL attribute to avoid requiring SUPER privileges
     await connection.query(`
       CREATE FUNCTION CALCULATE_AGE(birth_date DATE)
       RETURNS INT
       DETERMINISTIC
+      NO SQL
       BEGIN
         RETURN TIMESTAMPDIFF(YEAR, birth_date, CURDATE());
       END;

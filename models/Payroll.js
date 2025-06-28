@@ -131,13 +131,18 @@ class Payroll {
               continue; // Skip this employee since we can't calculate properly
             }
             
-            // Calculate gross pay based on hours worked and salary
-            // This assumes hourly pay rate
+            // Calculate gross pay based on hours worked and hourly rate
             let grossPay = 0;
             
             if (employeeData.payment_frequency === 'Bi-Weekly') {
               // Bi-weekly pay is based on actual hours worked
-              grossPay = employee.totalHours * (employeeData.salary_amount / 80); // Assuming 80 hours in 2 weeks
+              if (employeeData.hourly_rate) {
+                // Use hourly rate if available
+                grossPay = employee.totalHours * employeeData.hourly_rate;
+              } else {
+                // Fallback to approximation from salary if hourly rate not set
+                grossPay = employee.totalHours * (employeeData.salary_amount / 80); // Assuming 80 hours in 2 weeks
+              }
             } else {
               // Monthly pay is based on the monthly salary regardless of hours
               grossPay = employeeData.salary_amount;
@@ -149,7 +154,7 @@ class Payroll {
               : 30; // Default age if unknown
             
             // Calculate deductions based on Antigua rules
-            const deductions = this.calculateDeductions(grossPay, age, payrollSettings);
+            const deductions = this.calculateDeductions(grossPay, age, payrollSettings, employeeData.payment_frequency, employeeData);
             
             // Save the payroll item
             const [payrollItem] = await connection.query(
@@ -164,8 +169,9 @@ class Payroll {
                 medical_benefits_employee,
                 medical_benefits_employer,
                 education_levy,
+                total_employer_contributions,
                 net_pay
-              ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+              ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
               [
                 payrollRunId,
                 employeeData.id,
@@ -177,6 +183,7 @@ class Payroll {
                 deductions.medicalBenefitsEmployee,
                 deductions.medicalBenefitsEmployer,
                 deductions.educationLevy,
+                deductions.totalEmployerContributions,
                 deductions.netPay
               ]
             );
@@ -285,9 +292,11 @@ class Payroll {
    * @param {number} grossPay - Gross pay amount
    * @param {number} age - Employee age
    * @param {Object} settings - Payroll settings
+   * @param {string} paymentFrequency - Payment frequency (Bi-Weekly or Monthly)
+   * @param {Object} employeeData - Employee data for exemption checks
    * @returns {Object} Calculated deductions
    */
-  static calculateDeductions(grossPay, age, settings) {
+  static calculateDeductions(grossPay, age, settings, paymentFrequency = 'Bi-Weekly', employeeData = null) {
     // Initialize deduction amounts
     let socialSecurityEmployee = 0;
     let socialSecurityEmployer = 0;
@@ -298,9 +307,20 @@ class Payroll {
     // 1. Social Security - 16% of gross salary (7% employee, 9% employer)
     // - Maximum monthly insurable earning is $6,500
     // - Employees above retirement age (65) are exempt
-    if (age < settings.retirement_age) {
+    // - Override isExemptSS can be used to exempt an employee
+    if (age < settings.retirement_age && !employeeData?.is_exempt_ss) {
+      // Calculate the cap based on the payment frequency
+      let socialSecurityCap = settings.social_security_max_insurable;
+      
+      // Prorate the cap for bi-weekly payments
+      if (paymentFrequency === 'Bi-Weekly') {
+        // Approximate period_days/month_days * 6500
+        // Assuming a bi-weekly period is ~14 days and a month is ~30 days
+        socialSecurityCap = (14 / 30) * settings.social_security_max_insurable;
+      }
+      
       // Calculate social security based on the capped amount
-      const insurable = Math.min(grossPay, settings.social_security_max_insurable);
+      const insurable = Math.min(grossPay, socialSecurityCap);
       socialSecurityEmployee = (insurable * settings.social_security_employee_rate) / 100;
       socialSecurityEmployer = (insurable * settings.social_security_employer_rate) / 100;
     }
@@ -308,7 +328,8 @@ class Payroll {
     // 2. Medical Benefits - 7% of gross salary (3.5% employee, 3.5% employer)
     // - Employees age 60-70 pay reduced rate (2.5% employee, 0% employer)
     // - Employees over 70 are exempt
-    if (age < settings.medical_benefits_max_age) {
+    // - Override isExemptMedical can be used to exempt an employee
+    if (age < settings.medical_benefits_max_age && !employeeData?.is_exempt_medical) {
       if (age < settings.medical_benefits_senior_age) {
         // Regular rate for employees under 60
         medicalBenefitsEmployee = (grossPay * settings.medical_benefits_employee_rate) / 100;
@@ -321,30 +342,33 @@ class Payroll {
       }
     }
     
-    // 3. Education Levy
+    // 3. Education Levy - Apply only for Monthly payments
     // - For salaries below $5,000: (gross - $541.67) * 2.5%
     // - For salaries above $5,000: [(5000 - $541.67) * 2.5%] + [(gross - 5000) * 5%]
-    if (grossPay <= settings.education_levy_threshold) {
-      // Apply the standard rate to amount above exemption
-      const taxable = Math.max(0, grossPay - settings.education_levy_exemption);
-      educationLevy = (taxable * settings.education_levy_rate) / 100;
-    } else {
-      // For salaries above threshold ($5,000), apply tiered calculation
-      const lowerTierTaxable = settings.education_levy_threshold - settings.education_levy_exemption;
-      const lowerTierLevy = (lowerTierTaxable * settings.education_levy_rate) / 100;
+    if (paymentFrequency === 'Monthly') {
+      if (grossPay <= settings.education_levy_threshold) {
+        // Apply the standard rate to amount above exemption
+        const taxable = Math.max(0, grossPay - settings.education_levy_exemption);
+        educationLevy = (taxable * settings.education_levy_rate) / 100;
+      } else {
+        // For salaries above threshold ($5,000), apply tiered calculation
+        const lowerTierTaxable = settings.education_levy_threshold - settings.education_levy_exemption;
+        const lowerTierLevy = (lowerTierTaxable * settings.education_levy_rate) / 100;
+        
+        const higherTierTaxable = grossPay - settings.education_levy_threshold;
+        const higherTierLevy = (higherTierTaxable * settings.education_levy_high_rate) / 100;
+        
+        educationLevy = lowerTierLevy + higherTierLevy;
+      }
       
-      const higherTierTaxable = grossPay - settings.education_levy_threshold;
-      const higherTierLevy = (higherTierTaxable * settings.education_levy_high_rate) / 100;
-      
-      educationLevy = lowerTierLevy + higherTierLevy;
+      // Ensure no negative amounts
+      educationLevy = Math.max(0, educationLevy);
     }
     
-    // Ensure no negative amounts
-    educationLevy = Math.max(0, educationLevy);
-    
     // Calculate net pay (gross pay minus all employee deductions)
-    const totalDeductions = socialSecurityEmployee + medicalBenefitsEmployee + educationLevy;
-    const netPay = grossPay - totalDeductions;
+    const totalEmployeeDeductions = socialSecurityEmployee + medicalBenefitsEmployee + educationLevy;
+    const totalEmployerContributions = socialSecurityEmployer + medicalBenefitsEmployer;
+    const netPay = grossPay - totalEmployeeDeductions;
     
     return {
       socialSecurityEmployee,
@@ -352,7 +376,8 @@ class Payroll {
       medicalBenefitsEmployee,
       medicalBenefitsEmployer,
       educationLevy,
-      totalDeductions,
+      totalDeductions: totalEmployeeDeductions,
+      totalEmployerContributions,
       netPay
     };
   }

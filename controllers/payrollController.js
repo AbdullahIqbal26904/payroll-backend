@@ -412,7 +412,8 @@ exports.downloadPaystub = async (req, res) => {
     
     // Set headers for PDF download
     res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename=paystub-${payrollItem.employee_name.replace(/\s+/g, '-')}-${payrollRunId}.pdf`);
+    const employeeName = payrollItem.employeeName || payrollItem.employee_name || 'Unknown';
+    res.setHeader('Content-Disposition', `attachment; filename=paystub-${employeeName.replace(/\s+/g, '-')}-${payrollRunId}.pdf`);
     
     // Send the PDF
     return res.send(pdfBuffer);

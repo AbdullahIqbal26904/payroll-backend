@@ -50,6 +50,10 @@ app.use((err, req, res, next) => {
 // Initialize database and start the server
 (async () => {
   try {
+    // Test database connection
+    const db = require('./config/db');
+    const [result] = await db.query('SELECT 1');
+    console.log('Database connection successful');
     
     // Start the server
     app.listen(PORT, () => {

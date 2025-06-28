@@ -40,9 +40,11 @@ const generatePaystubPDF = async (payrollItem, periodData, options = {}) => {
       // Add employee information
       doc.fontSize(12).font('Helvetica-Bold').text('Employee Information');
       doc.fontSize(10).font('Helvetica');
-      doc.text(`Name: ${payrollItem.employeeName}`);
-      if (payrollItem.employeeId) {
-        doc.text(`Employee ID: ${payrollItem.employeeId}`);
+      const employeeName = payrollItem.employeeName || payrollItem.employee_name || 'Unknown Employee';
+      const employeeId = payrollItem.employeeId || payrollItem.employee_id;
+      doc.text(`Name: ${employeeName}`);
+      if (employeeId) {
+        doc.text(`Employee ID: ${employeeId}`);
       }
       doc.moveDown();
       
@@ -67,10 +69,14 @@ const generatePaystubPDF = async (payrollItem, periodData, options = {}) => {
       doc.moveDown(0.5);
       
       // Regular earnings
+      // Handle both camelCase and snake_case property names
+      const hoursWorked = payrollItem.hours_worked || 0;
+      const grossPay = payrollItem.grossPay || payrollItem.gross_pay || 0;
+      
       doc.font('Helvetica')
         .text('Regular Earnings', 50, doc.y, { width: colWidth, align: 'left' })
-        .text(payrollItem.hoursWorked.toFixed(2), 50 + colWidth, doc.y - doc.currentLineHeight(), { width: colWidth, align: 'right' })
-        .text(`$${payrollItem.grossPay.toFixed(2)}`, 50 + colWidth * 2, doc.y - doc.currentLineHeight(), { width: colWidth, align: 'right' });
+        .text(hoursWorked, 50 + colWidth, doc.y - doc.currentLineHeight(), { width: colWidth, align: 'right' })
+        .text(`$${grossPay}`, 50 + colWidth * 2, doc.y - doc.currentLineHeight(), { width: colWidth, align: 'right' });
       
       // Add horizontal line
       doc.moveDown();
@@ -83,7 +89,7 @@ const generatePaystubPDF = async (payrollItem, periodData, options = {}) => {
       doc.font('Helvetica-Bold')
         .text('Gross Pay', 50, doc.y, { width: colWidth, align: 'left' })
         .text('', 50 + colWidth, doc.y - doc.currentLineHeight(), { width: colWidth, align: 'right' })
-        .text(`$${payrollItem.grossPay.toFixed(2)}`, 50 + colWidth * 2, doc.y - doc.currentLineHeight(), { width: colWidth, align: 'right' });
+        .text(`$${grossPay}`, 50 + colWidth * 2, doc.y - doc.currentLineHeight(), { width: colWidth, align: 'right' });
       
       doc.moveDown(1.5);
       
@@ -102,20 +108,25 @@ const generatePaystubPDF = async (payrollItem, periodData, options = {}) => {
         .stroke();
       doc.moveDown(0.5);
       
+      // Handle both camelCase and snake_case property names for deductions
+      const socialSecurityEmployee = payrollItem.socialSecurityEmployee || payrollItem.social_security_employee || 0;
+      const medicalBenefitsEmployee = payrollItem.medicalBenefitsEmployee || payrollItem.medical_benefits_employee || 0;
+      const educationLevy = payrollItem.educationLevy || payrollItem.education_levy || 0;
+      
       // Social Security
       doc.font('Helvetica')
         .text('Social Security (7%)', 50, doc.y, { width: colWidth * 2, align: 'left' })
-        .text(`$${payrollItem.socialSecurityEmployee.toFixed(2)}`, 50 + colWidth * 2, doc.y - doc.currentLineHeight(), { width: colWidth, align: 'right' });
+        .text(`$${socialSecurityEmployee}`, 50 + colWidth * 2, doc.y - doc.currentLineHeight(), { width: colWidth, align: 'right' });
       
       // Medical Benefits
       doc.font('Helvetica')
         .text('Medical Benefits', 50, doc.y, { width: colWidth * 2, align: 'left' })
-        .text(`$${payrollItem.medicalBenefitsEmployee.toFixed(2)}`, 50 + colWidth * 2, doc.y - doc.currentLineHeight(), { width: colWidth, align: 'right' });
+        .text(`$${medicalBenefitsEmployee}`, 50 + colWidth * 2, doc.y - doc.currentLineHeight(), { width: colWidth, align: 'right' });
       
       // Education Levy
       doc.font('Helvetica')
         .text('Education Levy', 50, doc.y, { width: colWidth * 2, align: 'left' })
-        .text(`$${payrollItem.educationLevy.toFixed(2)}`, 50 + colWidth * 2, doc.y - doc.currentLineHeight(), { width: colWidth, align: 'right' });
+        .text(`$${educationLevy}`, 50 + colWidth * 2, doc.y - doc.currentLineHeight(), { width: colWidth, align: 'right' });
       
       // Add horizontal line
       doc.moveDown();
@@ -125,17 +136,18 @@ const generatePaystubPDF = async (payrollItem, periodData, options = {}) => {
       doc.moveDown(0.5);
       
       // Total deductions
-      const totalDeductions = payrollItem.socialSecurityEmployee + payrollItem.medicalBenefitsEmployee + payrollItem.educationLevy;
+      const totalDeductions = socialSecurityEmployee + medicalBenefitsEmployee + educationLevy;
       doc.font('Helvetica-Bold')
         .text('Total Deductions', 50, doc.y, { width: colWidth * 2, align: 'left' })
-        .text(`$${totalDeductions.toFixed(2)}`, 50 + colWidth * 2, doc.y - doc.currentLineHeight(), { width: colWidth, align: 'right' });
+        .text(`$${totalDeductions}`, 50 + colWidth * 2, doc.y - doc.currentLineHeight(), { width: colWidth, align: 'right' });
       
       doc.moveDown(1.5);
       
       // Net pay
+      const netPay = payrollItem.netPay || payrollItem.net_pay || 0;
       doc.font('Helvetica-Bold')
         .text('Net Pay', 50, doc.y, { width: colWidth * 2, align: 'left' })
-        .text(`$${payrollItem.netPay.toFixed(2)}`, 50 + colWidth * 2, doc.y - doc.currentLineHeight(), { width: colWidth, align: 'right' });
+        .text(`$${netPay}`, 50 + colWidth * 2, doc.y - doc.currentLineHeight(), { width: colWidth, align: 'right' });
       
       // Add employer contributions section
       doc.moveDown(1.5);
@@ -153,15 +165,19 @@ const generatePaystubPDF = async (payrollItem, periodData, options = {}) => {
         .stroke();
       doc.moveDown(0.5);
       
+      // Handle both camelCase and snake_case property names for employer contributions
+      const socialSecurityEmployer = payrollItem.socialSecurityEmployer || payrollItem.social_security_employer || 0;
+      const medicalBenefitsEmployer = payrollItem.medicalBenefitsEmployer || payrollItem.medical_benefits_employer || 0;
+      
       // Employer Social Security
       doc.font('Helvetica')
         .text('Social Security (9%)', 50, doc.y, { width: colWidth * 2, align: 'left' })
-        .text(`$${payrollItem.socialSecurityEmployer.toFixed(2)}`, 50 + colWidth * 2, doc.y - doc.currentLineHeight(), { width: colWidth, align: 'right' });
+        .text(`$${socialSecurityEmployer}`, 50 + colWidth * 2, doc.y - doc.currentLineHeight(), { width: colWidth, align: 'right' });
       
       // Employer Medical Benefits
       doc.font('Helvetica')
         .text('Medical Benefits', 50, doc.y, { width: colWidth * 2, align: 'left' })
-        .text(`$${payrollItem.medicalBenefitsEmployer.toFixed(2)}`, 50 + colWidth * 2, doc.y - doc.currentLineHeight(), { width: colWidth, align: 'right' });
+        .text(`$${medicalBenefitsEmployer}`, 50 + colWidth * 2, doc.y - doc.currentLineHeight(), { width: colWidth, align: 'right' });
       
       // Add horizontal line
       doc.moveDown();
@@ -171,10 +187,10 @@ const generatePaystubPDF = async (payrollItem, periodData, options = {}) => {
       doc.moveDown(0.5);
       
       // Total employer contributions
-      const totalEmployerContributions = payrollItem.socialSecurityEmployer + payrollItem.medicalBenefitsEmployer;
+      const totalEmployerContributions = socialSecurityEmployer + medicalBenefitsEmployer;
       doc.font('Helvetica-Bold')
         .text('Total Employer Contributions', 50, doc.y, { width: colWidth * 2, align: 'left' })
-        .text(`$${totalEmployerContributions.toFixed(2)}`, 50 + colWidth * 2, doc.y - doc.currentLineHeight(), { width: colWidth, align: 'right' });
+        .text(`$${totalEmployerContributions}`, 50 + colWidth * 2, doc.y - doc.currentLineHeight(), { width: colWidth, align: 'right' });
       
       // Add footer
       doc.fontSize(8).font('Helvetica')

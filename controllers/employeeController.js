@@ -20,7 +20,10 @@ exports.addEmployee = async (req, res) => {
     job_title, 
     department, 
     salary_amount, 
-    payment_frequency 
+    hourly_rate,
+    payment_frequency,
+    is_exempt_ss,
+    is_exempt_medical
   } = req.body;
   
   try {
@@ -75,9 +78,10 @@ exports.addEmployee = async (req, res) => {
     // Create employee record
     const [result] = await db.query(
       `INSERT INTO employees 
-       (user_id, employee_id, first_name, last_name, date_of_birth, gender, address, phone, 
-        hire_date, job_title, department, salary_amount, payment_frequency, date_of_birth_for_age) 
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       (user_id, employee_id, first_name, last_name, date_of_birth, gender, address, phone, email,
+        hire_date, job_title, department, salary_amount, hourly_rate, payment_frequency, 
+        is_exempt_ss, is_exempt_medical, date_of_birth_for_age) 
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         userId, 
         employeeId, 
@@ -87,11 +91,15 @@ exports.addEmployee = async (req, res) => {
         gender, 
         address, 
         phone, 
+        email, 
         hire_date, 
         job_title, 
         department, 
         salary_amount, 
+        hourly_rate || 0.00,
         payment_frequency, 
+        is_exempt_ss || false,
+        is_exempt_medical || false,
         dateOfBirthForAge
       ]
     );
