@@ -87,9 +87,7 @@ class Payroll {
         
         // Get settings for calculations
         const [settings] = await connection.query('SELECT * FROM payroll_settings LIMIT 1');
-        const payrollSettings = settings[0];
-        
-        // Process each employee
+        const payrollSettings = settings[0];            // Process each employee
         const payrollItems = [];
         const errors = [];
         
@@ -97,6 +95,8 @@ class Payroll {
           const employee = employeeHours[employeeKey];
           
           try {
+            console.log(`Processing employee: ${employee.firstName} ${employee.lastName}, Total Hours: ${employee.totalHours}`);
+            
             // Get employee details from database if possible
             let employeeData = null;
             
@@ -108,6 +108,7 @@ class Payroll {
               
               if (employees.length > 0) {
                 employeeData = employees[0];
+                console.log(`Employee data found: ${employeeData.first_name} ${employeeData.last_name}, Salary: ${employeeData.salary_amount}, Rate: ${employeeData.hourly_rate}, Frequency: ${employeeData.payment_frequency}`);
               }
             }
             
@@ -131,22 +132,29 @@ class Payroll {
               continue; // Skip this employee since we can't calculate properly
             }
             
-            // Calculate gross pay based on hours worked and hourly rate
+            // Calculate gross pay based on either hourly rate or salary
             let grossPay = 0;
             
-            if (employeeData.payment_frequency === 'Bi-Weekly') {
-              // Bi-weekly pay is based on actual hours worked
-              if (employeeData.hourly_rate) {
-                // Use hourly rate if available
-                grossPay = employee.totalHours * employeeData.hourly_rate;
+            if (employeeData.hourly_rate && employeeData.hourly_rate > 0) {
+              // If hourly rate is set, calculate based on hours worked
+              grossPay = employee.totalHours * employeeData.hourly_rate;
+              console.log(`Calculated hourly pay: ${employee.totalHours} hours * ${employeeData.hourly_rate} rate = ${grossPay}`);
+            } else if (employeeData.salary_amount && employeeData.salary_amount > 0) {
+              // If salary is set, use the salary amount based on payment frequency
+              if (employeeData.payment_frequency === 'Bi-Weekly') {
+                // For bi-weekly payment, convert monthly salary to bi-weekly
+                // Assuming 26 pay periods per year (52 weeks / 2)
+                const biWeeklySalary = (employeeData.salary_amount * 12) / 26;
+                grossPay = biWeeklySalary;
               } else {
-                // Fallback to approximation from salary if hourly rate not set
-                grossPay = employee.totalHours * (employeeData.salary_amount / 80); // Assuming 80 hours in 2 weeks
+                // Monthly pay is the full salary amount
+                grossPay = employeeData.salary_amount;
               }
-            } else {
-              // Monthly pay is based on the monthly salary regardless of hours
-              grossPay = employeeData.salary_amount;
+              console.log(`Using salary amount: ${employeeData.salary_amount}, payment frequency: ${employeeData.payment_frequency}, calculated: ${grossPay}`);
             }
+            
+            // Ensure gross pay is never negative and is properly rounded
+            grossPay = Math.max(0, parseFloat(grossPay.toFixed(2)));
             
             // Calculate age for benefits determination
             const age = employeeData.date_of_birth 

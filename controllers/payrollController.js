@@ -389,17 +389,20 @@ exports.downloadPaystub = async (req, res) => {
     }
     
     // Find the specific employee's payroll item
-    const payrollItem = payrollRun.items.find(item => 
-      (item.employee_id && item.employee_id.toString() === employeeId) || 
+    const payrollItem = payrollRun.items.find(item =>
+      (item.employee_id && item.employee_id.toString() === employeeId) ||
       (item.id && item.id.toString() === employeeId)
     );
     
     if (!payrollItem) {
-      return res.status(404).json(formatError({
-        message: 'Employee payroll data not found'
-      }));
+      return res.status(404).json(formatError('Employee payroll data not found'));
     }
-    
+
+    // Ensure gross pay is properly formatted
+    if (payrollItem.gross_pay) {
+      payrollItem.gross_pay = parseFloat(payrollItem.gross_pay).toFixed(2);
+    }
+
     // Prepare period data for PDF
     const periodData = {
       periodStart: payrollRun.period_start ? new Date(payrollRun.period_start).toLocaleDateString() : 'N/A',

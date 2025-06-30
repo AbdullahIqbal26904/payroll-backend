@@ -70,12 +70,20 @@ const generatePaystubPDF = async (payrollItem, periodData, options = {}) => {
       
       // Regular earnings
       // Handle both camelCase and snake_case property names
-      const hoursWorked = payrollItem.hours_worked || 0;
-      const grossPay = payrollItem.grossPay || payrollItem.gross_pay || 0;
+      const hoursWorked = payrollItem.hoursWorked || payrollItem.hours_worked || 0;
+      
+      // Log data for debugging
+      console.log('PDF Generation - Payroll Item:', {
+        employeeName: payrollItem.employee_name || payrollItem.employeeName,
+        grossPay: payrollItem.grossPay || payrollItem.gross_pay,
+        hoursWorked: hoursWorked
+      });
+      
+      const grossPay = parseFloat(payrollItem.grossPay || payrollItem.gross_pay || 0).toFixed(2);
       
       doc.font('Helvetica')
         .text('Regular Earnings', 50, doc.y, { width: colWidth, align: 'left' })
-        .text(hoursWorked, 50 + colWidth, doc.y - doc.currentLineHeight(), { width: colWidth, align: 'right' })
+        .text(hoursWorked.toString(), 50 + colWidth, doc.y - doc.currentLineHeight(), { width: colWidth, align: 'right' })
         .text(`$${grossPay}`, 50 + colWidth * 2, doc.y - doc.currentLineHeight(), { width: colWidth, align: 'right' });
       
       // Add horizontal line
@@ -109,9 +117,9 @@ const generatePaystubPDF = async (payrollItem, periodData, options = {}) => {
       doc.moveDown(0.5);
       
       // Handle both camelCase and snake_case property names for deductions
-      const socialSecurityEmployee = payrollItem.socialSecurityEmployee || payrollItem.social_security_employee || 0;
-      const medicalBenefitsEmployee = payrollItem.medicalBenefitsEmployee || payrollItem.medical_benefits_employee || 0;
-      const educationLevy = payrollItem.educationLevy || payrollItem.education_levy || 0;
+      const socialSecurityEmployee = parseFloat(payrollItem.socialSecurityEmployee || payrollItem.social_security_employee || 0).toFixed(2);
+      const medicalBenefitsEmployee = parseFloat(payrollItem.medicalBenefitsEmployee || payrollItem.medical_benefits_employee || 0).toFixed(2);
+      const educationLevy = parseFloat(payrollItem.educationLevy || payrollItem.education_levy || 0).toFixed(2);
       
       // Social Security
       doc.font('Helvetica')
@@ -136,15 +144,15 @@ const generatePaystubPDF = async (payrollItem, periodData, options = {}) => {
       doc.moveDown(0.5);
       
       // Total deductions
-      const totalDeductions = socialSecurityEmployee + medicalBenefitsEmployee + educationLevy;
+      const totalDeductions = parseFloat(socialSecurityEmployee) + parseFloat(medicalBenefitsEmployee) + parseFloat(educationLevy);
       doc.font('Helvetica-Bold')
         .text('Total Deductions', 50, doc.y, { width: colWidth * 2, align: 'left' })
-        .text(`$${totalDeductions}`, 50 + colWidth * 2, doc.y - doc.currentLineHeight(), { width: colWidth, align: 'right' });
+        .text(`$${totalDeductions.toFixed(2)}`, 50 + colWidth * 2, doc.y - doc.currentLineHeight(), { width: colWidth, align: 'right' });
       
       doc.moveDown(1.5);
       
       // Net pay
-      const netPay = payrollItem.netPay || payrollItem.net_pay || 0;
+      const netPay = parseFloat(payrollItem.netPay || payrollItem.net_pay || 0).toFixed(2);
       doc.font('Helvetica-Bold')
         .text('Net Pay', 50, doc.y, { width: colWidth * 2, align: 'left' })
         .text(`$${netPay}`, 50 + colWidth * 2, doc.y - doc.currentLineHeight(), { width: colWidth, align: 'right' });
@@ -166,8 +174,8 @@ const generatePaystubPDF = async (payrollItem, periodData, options = {}) => {
       doc.moveDown(0.5);
       
       // Handle both camelCase and snake_case property names for employer contributions
-      const socialSecurityEmployer = payrollItem.socialSecurityEmployer || payrollItem.social_security_employer || 0;
-      const medicalBenefitsEmployer = payrollItem.medicalBenefitsEmployer || payrollItem.medical_benefits_employer || 0;
+      const socialSecurityEmployer = parseFloat(payrollItem.socialSecurityEmployer || payrollItem.social_security_employer || 0).toFixed(2);
+      const medicalBenefitsEmployer = parseFloat(payrollItem.medicalBenefitsEmployer || payrollItem.medical_benefits_employer || 0).toFixed(2);
       
       // Employer Social Security
       doc.font('Helvetica')
@@ -187,10 +195,10 @@ const generatePaystubPDF = async (payrollItem, periodData, options = {}) => {
       doc.moveDown(0.5);
       
       // Total employer contributions
-      const totalEmployerContributions = socialSecurityEmployer + medicalBenefitsEmployer;
+      const totalEmployerContributions = parseFloat(socialSecurityEmployer) + parseFloat(medicalBenefitsEmployer);
       doc.font('Helvetica-Bold')
         .text('Total Employer Contributions', 50, doc.y, { width: colWidth * 2, align: 'left' })
-        .text(`$${totalEmployerContributions}`, 50 + colWidth * 2, doc.y - doc.currentLineHeight(), { width: colWidth, align: 'right' });
+        .text(`$${totalEmployerContributions.toFixed(2)}`, 50 + colWidth * 2, doc.y - doc.currentLineHeight(), { width: colWidth, align: 'right' });
       
       // Add footer
       doc.fontSize(8).font('Helvetica')
