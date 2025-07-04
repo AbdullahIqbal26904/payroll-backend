@@ -1,4 +1,5 @@
 const db = require('../config/db');
+const EmployeeLoan = require('./EmployeeLoan');
 
 /**
  * @class Payroll
@@ -161,8 +162,22 @@ class Payroll {
               ? this.calculateAge(new Date(employeeData.date_of_birth)) 
               : 30; // Default age if unknown
             
+            // Check if employee has any active loans
+            let loanData = null;
+            if (employeeData.id) {
+              const activeLoans = await EmployeeLoan.getActiveLoansForEmployee(employeeData.id);
+              if (activeLoans.length > 0) {
+                // Use the first active loan (or we could sum multiple loans if needed)
+                const activeLoan = activeLoans[0];
+                loanData = {
+                  id: activeLoan.id,
+                  amount: Math.min(activeLoan.installment_amount, activeLoan.remaining_amount) // Don't deduct more than remaining
+                };
+              }
+            }
+            
             // Calculate deductions based on Antigua rules
-            const deductions = this.calculateDeductions(grossPay, age, payrollSettings, employeeData.payment_frequency, employeeData);
+            const deductions = this.calculateDeductions(grossPay, age, payrollSettings, employeeData.payment_frequency, employeeData, loanData);
             
             // Save the payroll item
             const [payrollItem] = await connection.query(
@@ -177,9 +192,10 @@ class Payroll {
                 medical_benefits_employee,
                 medical_benefits_employer,
                 education_levy,
+                loan_deduction,
                 total_employer_contributions,
                 net_pay
-              ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+              ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
               [
                 payrollRunId,
                 employeeData.id,
@@ -191,19 +207,21 @@ class Payroll {
                 deductions.medicalBenefitsEmployee,
                 deductions.medicalBenefitsEmployer,
                 deductions.educationLevy,
+                deductions.loanDeduction || 0,
                 deductions.totalEmployerContributions,
                 deductions.netPay
               ]
             );
             
-            payrollItems.push({
-              id: payrollItem.insertId,
-              employeeId: employeeData.id,
-              employeeName: `${employeeData.first_name} ${employeeData.last_name}`,
-              hoursWorked: employee.totalHours,
-              grossPay,
-              ...deductions
-            });
+            // If there's a loan, process the loan payment
+            if (loanData && loanData.id && deductions.loanDeduction > 0) {
+              await EmployeeLoan.processPayment(
+                loanData.id, 
+                payrollItem.insertId, 
+                deductions.loanDeduction,
+                options.payDate || new Date()
+              );
+            }
             
           } catch (error) {
             console.error(`Error processing employee ${employeeKey}:`, error);
@@ -302,15 +320,17 @@ class Payroll {
    * @param {Object} settings - Payroll settings
    * @param {string} paymentFrequency - Payment frequency (Bi-Weekly or Monthly)
    * @param {Object} employeeData - Employee data for exemption checks
+   * @param {Object} loanData - Optional loan data for this employee
    * @returns {Object} Calculated deductions
    */
-  static calculateDeductions(grossPay, age, settings, paymentFrequency = 'Bi-Weekly', employeeData = null) {
+  static calculateDeductions(grossPay, age, settings, paymentFrequency = 'Bi-Weekly', employeeData = null, loanData = null) {
     // Initialize deduction amounts
     let socialSecurityEmployee = 0;
     let socialSecurityEmployer = 0;
     let medicalBenefitsEmployee = 0;
     let medicalBenefitsEmployer = 0;
     let educationLevy = 0;
+    let loanDeduction = 0;
     
     // 1. Social Security - 16% of gross salary (7% employee, 9% employer)
     // - Maximum monthly insurable earning is $6,500
@@ -373,8 +393,13 @@ class Payroll {
       educationLevy = Math.max(0, educationLevy);
     }
     
+    // 4. Loan Deduction - If the employee has an active loan
+    if (loanData && loanData.amount > 0) {
+      loanDeduction = loanData.amount;
+    }
+    
     // Calculate net pay (gross pay minus all employee deductions)
-    const totalEmployeeDeductions = socialSecurityEmployee + medicalBenefitsEmployee + educationLevy;
+    const totalEmployeeDeductions = socialSecurityEmployee + medicalBenefitsEmployee + educationLevy + loanDeduction;
     const totalEmployerContributions = socialSecurityEmployer + medicalBenefitsEmployer;
     const netPay = grossPay - totalEmployeeDeductions;
     
@@ -384,6 +409,7 @@ class Payroll {
       medicalBenefitsEmployee,
       medicalBenefitsEmployer,
       educationLevy,
+      loanDeduction,
       totalDeductions: totalEmployeeDeductions,
       totalEmployerContributions,
       netPay

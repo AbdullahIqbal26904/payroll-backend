@@ -11,6 +11,7 @@ This document outlines the API endpoints for Phase 2 of the MSA Payroll System f
    - Education Levy (tiered rates based on salary threshold)
 3. PDF paystub generation
 4. Email delivery of paystubs to employees
+5. Employee loan management with payroll deductions
 
 ## Authentication
 
@@ -27,6 +28,283 @@ http://localhost:5001/api
 ```
 
 ## Endpoints
+
+### Employee Loan Management
+
+#### Get All Loans
+
+Retrieve a list of all employee loans with pagination and optional filtering.
+
+- **URL:** `/loans`
+- **Method:** `GET`
+- **Auth required:** Yes (Admin only)
+- **Query Parameters:**
+
+| Parameter | Type | Description |
+| --------- | ---- | ----------- |
+| page | Number | Page number (default: 1) |
+| limit | Number | Items per page (default: 10) |
+| employeeId | Number | Filter loans by employee ID (optional) |
+| status | String | Filter loans by status (e.g., 'active', 'paid', 'defaulted') (optional) |
+
+**Success Response:**
+```json
+{
+  "success": true,
+  "message": "Employee loans retrieved successfully",
+  "data": {
+    "loans": [
+      {
+        "id": 1,
+        "employee_id": 5,
+        "employee_name": "John Doe",
+        "loan_amount": 5000.00,
+        "interest_rate": 5.5,
+        "total_payable": 5275.00,
+        "installment_amount": 220.00,
+        "remaining_balance": 3935.00,
+        "start_date": "2025-05-01",
+        "expected_end_date": "2025-11-15",
+        "status": "active",
+        "created_at": "2025-04-25T10:30:00.000Z"
+      }
+    ],
+    "totalCount": 1,
+    "page": 1,
+    "totalPages": 1
+  }
+}
+```
+
+#### Get Loan by ID
+
+Retrieve details of a specific employee loan by its ID.
+
+- **URL:** `/loans/:id`
+- **Method:** `GET`
+- **Auth required:** Yes (Admin only)
+- **URL Parameters:**
+
+| Parameter | Description |
+| --------- | ----------- |
+| id | ID of the loan to retrieve |
+
+**Success Response:**
+```json
+{
+  "success": true,
+  "message": "Loan retrieved successfully",
+  "data": {
+    "id": 1,
+    "employee_id": 5,
+    "employee_name": "John Doe",
+    "loan_amount": 5000.00,
+    "interest_rate": 5.5,
+    "total_payable": 5275.00,
+    "installment_amount": 220.00,
+    "remaining_balance": 3935.00,
+    "start_date": "2025-05-01",
+    "expected_end_date": "2025-11-15",
+    "status": "active",
+    "created_at": "2025-04-25T10:30:00.000Z",
+    "payments": [
+      {
+        "id": 1,
+        "loan_id": 1,
+        "payroll_item_id": 42,
+        "payment_date": "2025-05-15",
+        "payment_amount": 220.00,
+        "principal_amount": 192.50,
+        "interest_amount": 27.50,
+        "remaining_balance": 4780.00,
+        "created_at": "2025-05-15T16:30:00.000Z"
+      },
+      {
+        "id": 2,
+        "loan_id": 1,
+        "payroll_item_id": 65,
+        "payment_date": "2025-05-31",
+        "payment_amount": 220.00,
+        "principal_amount": 195.00,
+        "interest_amount": 25.00,
+        "remaining_balance": 4585.00,
+        "created_at": "2025-05-31T16:30:00.000Z"
+      }
+    ]
+  }
+}
+```
+
+#### Create Employee Loan
+
+Create a new employee loan record.
+
+- **URL:** `/loans`
+- **Method:** `POST`
+- **Auth required:** Yes (Admin only)
+- **Content-Type:** `application/json`
+
+**Request Body:**
+```json
+{
+  "employee_id": 5,
+  "loan_amount": 5000.00,
+  "interest_rate": 5.5,
+  "installment_amount": 220.00,
+  "start_date": "2025-05-01",
+  "expected_end_date": "2025-11-15",
+  "notes": "Education loan for employee's MBA program"
+}
+```
+
+**Required Fields:**
+- `employee_id` - ID of the employee receiving the loan
+- `loan_amount` - Principal amount of the loan
+- `interest_rate` - Annual interest rate (percentage)
+- `installment_amount` - Amount to be deducted per pay period
+- `start_date` - Date when loan becomes effective
+
+**Optional Fields:**
+- `expected_end_date` - Expected loan completion date (calculated automatically if not provided)
+- `notes` - Additional information about the loan
+
+**Success Response:**
+```json
+{
+  "success": true,
+  "message": "Employee loan created successfully",
+  "data": {
+    "id": 1,
+    "employee_id": 5,
+    "loan_amount": 5000.00,
+    "interest_rate": 5.5,
+    "total_payable": 5275.00,
+    "installment_amount": 220.00,
+    "remaining_balance": 5000.00,
+    "start_date": "2025-05-01",
+    "expected_end_date": "2025-11-15",
+    "status": "active",
+    "notes": "Education loan for employee's MBA program",
+    "created_at": "2025-04-25T10:30:00.000Z"
+  }
+}
+```
+
+#### Update Employee Loan
+
+Update an existing employee loan record.
+
+- **URL:** `/loans/:id`
+- **Method:** `PUT`
+- **Auth required:** Yes (Admin only)
+- **Content-Type:** `application/json`
+- **URL Parameters:**
+
+| Parameter | Description |
+| --------- | ----------- |
+| id | ID of the loan to update |
+
+**Request Body:**
+```json
+{
+  "installment_amount": 250.00,
+  "status": "paused",
+  "notes": "Temporarily paused due to employee request"
+}
+```
+
+**Updatable Fields:**
+- `installment_amount` - Amount to be deducted per pay period
+- `status` - Loan status ('active', 'paused', 'paid', 'defaulted', 'cancelled')
+- `notes` - Additional information about the loan
+
+**Note:** Certain fields like loan_amount, interest_rate, and employee_id cannot be modified after loan creation
+
+**Success Response:**
+```json
+{
+  "success": true,
+  "message": "Employee loan updated successfully",
+  "data": {
+    "id": 1,
+    "employee_id": 5,
+    "loan_amount": 5000.00,
+    "interest_rate": 5.5,
+    "total_payable": 5275.00,
+    "installment_amount": 250.00,
+    "remaining_balance": 3935.00,
+    "start_date": "2025-05-01",
+    "expected_end_date": "2025-11-15",
+    "status": "paused",
+    "notes": "Temporarily paused due to employee request",
+    "updated_at": "2025-06-10T14:15:00.000Z"
+  }
+}
+```
+
+#### Get Loans for Specific Employee
+
+Retrieve all loans associated with a specific employee.
+
+- **URL:** `/employees/:id/loans`
+- **Method:** `GET`
+- **Auth required:** Yes (Admin only)
+- **URL Parameters:**
+
+| Parameter | Description |
+| --------- | ----------- |
+| id | ID of the employee |
+
+**Query Parameters:**
+
+| Parameter | Type | Description |
+| --------- | ---- | ----------- |
+| page | Number | Page number (default: 1) |
+| limit | Number | Items per page (default: 10) |
+| status | String | Filter loans by status (e.g., 'active', 'paid', 'defaulted') (optional) |
+
+**Success Response:**
+```json
+{
+  "success": true,
+  "message": "Employee loans retrieved successfully",
+  "data": {
+    "loans": [
+      {
+        "id": 1,
+        "employee_id": 5,
+        "employee_name": "John Doe",
+        "loan_amount": 5000.00,
+        "interest_rate": 5.5,
+        "total_payable": 5275.00,
+        "installment_amount": 250.00,
+        "remaining_balance": 3935.00,
+        "start_date": "2025-05-01",
+        "expected_end_date": "2025-11-15",
+        "status": "active",
+        "created_at": "2025-04-25T10:30:00.000Z"
+      },
+      {
+        "id": 3,
+        "employee_id": 5,
+        "employee_name": "John Doe",
+        "loan_amount": 1000.00,
+        "interest_rate": 3.0,
+        "total_payable": 1030.00,
+        "installment_amount": 100.00,
+        "remaining_balance": 0.00,
+        "start_date": "2025-01-15",
+        "expected_end_date": "2025-03-31",
+        "status": "paid",
+        "created_at": "2025-01-10T09:45:00.000Z"
+      }
+    ],
+    "totalCount": 2,
+    "page": 1,
+    "totalPages": 1
+  }
+}
+```
 
 ### Upload Timesheet CSV
 

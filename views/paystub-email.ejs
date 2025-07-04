@@ -38,6 +38,12 @@
           <td>Gross Pay</td>
           <td>$<%= grossPay.toFixed(2) %></td>
         </tr>
+        <% if (loanDeduction && loanDeduction > 0) { %>
+        <tr>
+          <td>Loan Repayment</td>
+          <td>$<%= loanDeduction.toFixed(2) %></td>
+        </tr>
+        <% } %>
         <tr>
           <td>Net Pay</td>
           <td>$<%= netPay.toFixed(2) %></td>

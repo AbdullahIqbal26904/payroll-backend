@@ -403,6 +403,19 @@ exports.downloadPaystub = async (req, res) => {
       payrollItem.gross_pay = parseFloat(payrollItem.gross_pay).toFixed(2);
     }
 
+    // Get employee loan information if there's a loan deduction
+    let loanDetails = null;
+    if (payrollItem.loan_deduction && parseFloat(payrollItem.loan_deduction) > 0) {
+      // Get active loans for this employee
+      const EmployeeLoan = require('../models/EmployeeLoan');
+      const activeLoans = await EmployeeLoan.getActiveLoansForEmployee(employeeId);
+      
+      if (activeLoans && activeLoans.length > 0) {
+        // Just get the first active loan for now - could be enhanced to match specific loan
+        loanDetails = activeLoans[0];
+      }
+    }
+
     // Prepare period data for PDF
     const periodData = {
       periodStart: payrollRun.period_start ? new Date(payrollRun.period_start).toLocaleDateString() : 'N/A',
@@ -411,7 +424,7 @@ exports.downloadPaystub = async (req, res) => {
     };
     
     // Generate PDF
-    const pdfBuffer = await generatePaystubPDF(payrollItem, periodData);
+    const pdfBuffer = await generatePaystubPDF(payrollItem, periodData, { loanDetails });
     
     // Set headers for PDF download
     res.setHeader('Content-Type', 'application/pdf');
@@ -517,223 +530,6 @@ exports.updatePayrollSettings = async (req, res) => {
     return res.status(200).json(formatSuccess('Payroll settings updated successfully', settings[0]));
   } catch (error) {
     console.error('Error updating payroll settings:', error);
-    return res.status(500).json(formatError(error));
-  }
-};
-
-/**
- * @desc    Email paystubs to employees
- * @route   POST /api/payroll/email-paystubs
- * @access  Private/Admin
- */
-exports.emailPaystubs = async (req, res) => {
-  try {
-    const { payrollRunId, sendToAll = false, employeeIds = [] } = req.body;
-    
-    if (!payrollRunId) {
-      return res.status(400).json(formatError({
-        message: 'Payroll run ID is required'
-      }));
-    }
-    
-    // Get the payroll run data
-    const payrollRun = await Payroll.getPayrollRunById(payrollRunId);
-    
-    if (!payrollRun) {
-      return res.status(404).json(formatError({
-        message: 'Payroll run not found'
-      }));
-    }
-    
-    // Filter payroll items if not sending to all
-    const payrollItems = sendToAll 
-      ? payrollRun.items 
-      : payrollRun.items.filter(item => employeeIds.includes(item.employee_id));
-    
-    if (payrollItems.length === 0) {
-      return res.status(400).json(formatError({
-        message: 'No employees to send paystubs to'
-      }));
-    }
-    
-    // Get employee email addresses
-    const employeeEmails = [];
-    
-    for (const item of payrollItems) {
-      if (item.employee_id) {
-        const [employees] = await db.query(
-          `SELECT e.id, e.first_name, e.last_name, u.email 
-           FROM employees e
-           LEFT JOIN users u ON e.user_id = u.id
-           WHERE e.id = ?`,
-          [item.employee_id]
-        );
-        
-        if (employees.length > 0 && employees[0].email) {
-          employeeEmails.push({
-            id: item.id,
-            employeeId: item.employee_id,
-            name: item.employee_name,
-            email: employees[0].email,
-            payrollItem: item
-          });
-        }
-      }
-    }
-    
-    if (employeeEmails.length === 0) {
-      return res.status(400).json(formatError({
-        message: 'No employees with valid email addresses found'
-      }));
-    }
-    
-    // Setup email transporter
-    const transporter = nodemailer.createTransport({
-      host: process.env.EMAIL_HOST,
-      port: parseInt(process.env.EMAIL_PORT, 10),
-      secure: process.env.EMAIL_SECURE === 'true',
-      auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASSWORD
-      }
-    });
-    
-    // Prepare and send emails
-    const emailResults = [];
-    const emailTemplate = path.join(__dirname, '../views/paystub-email.ejs');
-    
-    // Create the views directory and template if they don't exist
-    if (!fs.existsSync(emailTemplate)) {
-      // Create a simple email template if it doesn't exist
-      const templateDir = path.join(__dirname, '../views');
-      
-      if (!fs.existsSync(templateDir)) {
-        fs.mkdirSync(templateDir, { recursive: true });
-      }
-      
-      const defaultTemplate = `
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <title>Your Paystub</title>
-  <style>
-    body { font-family: Arial, sans-serif; line-height: 1.6; }
-    .container { width: 100%; max-width: 600px; margin: 0 auto; }
-    .header { background-color: #f4f4f4; padding: 10px; text-align: center; }
-    .content { padding: 20px; }
-    .footer { font-size: 12px; text-align: center; margin-top: 30px; color: #777; }
-  </style>
-</head>
-<body>
-  <div class="container">
-    <div class="header">
-      <h2>MSA Payroll System</h2>
-    </div>
-    <div class="content">
-      <p>Dear <%= employeeName %>,</p>
-      <p>Please find attached your paystub for the period <%= periodStart %> to <%= periodEnd %>.</p>
-      <p>Payment Details:</p>
-      <ul>
-        <li>Pay Date: <%= payDate %></li>
-        <li>Gross Pay: $<%= grossPay.toFixed(2) %></li>
-        <li>Net Pay: $<%= netPay.toFixed(2) %></li>
-      </ul>
-      <p>If you have any questions regarding your paystub, please contact the payroll department.</p>
-      <p>Thank you,</p>
-      <p>MSA Payroll Team</p>
-    </div>
-    <div class="footer">
-      <p>This is an automated email. Please do not reply to this message.</p>
-    </div>
-  </div>
-</body>
-</html>
-      `;
-      
-      fs.writeFileSync(emailTemplate, defaultTemplate);
-    }
-    
-    // Prepare period data for PDF
-    const periodData = {
-      periodStart: payrollRun.period_start ? new Date(payrollRun.period_start).toLocaleDateString() : 'N/A',
-      periodEnd: payrollRun.period_end ? new Date(payrollRun.period_end).toLocaleDateString() : 'N/A',
-      payDate: payrollRun.pay_date ? new Date(payrollRun.pay_date).toLocaleDateString() : new Date().toLocaleDateString()
-    };
-    
-    // Send emails to each employee
-    for (const employee of employeeEmails) {
-      try {
-        // Generate PDF for this employee
-        const pdfBuffer = await generatePaystubPDF(employee.payrollItem, periodData);
-        
-        // Render email template
-        const emailHTML = await ejs.renderFile(emailTemplate, {
-          employeeName: employee.name,
-          periodStart: periodData.periodStart,
-          periodEnd: periodData.periodEnd,
-          payDate: periodData.payDate,
-          grossPay: employee.payrollItem.gross_pay,
-          netPay: employee.payrollItem.net_pay
-        });
-        
-        // Send email with paystub attachment
-        const info = await transporter.sendMail({
-          from: `"MSA Payroll" <${process.env.EMAIL_USER}>`,
-          to: employee.email,
-          subject: `Your Paystub for ${periodData.periodStart} - ${periodData.periodEnd}`,
-          html: emailHTML,
-          attachments: [
-            {
-              filename: `paystub-${employee.name.replace(/\s+/g, '-')}-${payrollRunId}.pdf`,
-              content: pdfBuffer,
-              contentType: 'application/pdf'
-            }
-          ]
-        });
-        
-        emailResults.push({
-          employeeId: employee.employeeId,
-          employeeName: employee.name,
-          email: employee.email,
-          messageId: info.messageId,
-          status: 'sent'
-        });
-        
-      } catch (emailError) {
-        console.error(`Error sending email to ${employee.name}:`, emailError);
-        
-        emailResults.push({
-          employeeId: employee.employeeId,
-          employeeName: employee.name,
-          email: employee.email,
-          error: emailError.message,
-          status: 'failed'
-        });
-      }
-    }
-    
-    // Log the email activity
-    await db.query(
-      `INSERT INTO audit_trail (user_id, action, entity, entity_id, new_values)
-       VALUES (?, ?, ?, ?, ?)`,
-      [
-        req.user.id,
-        'email_paystubs',
-        'payroll_run',
-        payrollRunId,
-        JSON.stringify({ emailResults })
-      ]
-    );
-    
-    return res.status(200).json(formatSuccess('Paystubs emailed to employees', {
-      totalSent: emailResults.filter(r => r.status === 'sent').length,
-      totalFailed: emailResults.filter(r => r.status === 'failed').length,
-      results: emailResults
-    }));
-    
-  } catch (error) {
-    console.error('Error emailing paystubs:', error);
     return res.status(500).json(formatError(error));
   }
 };
@@ -898,12 +694,16 @@ exports.emailPaystubs = async (req, res) => {
       try {
         const emailContent = await ejs.renderFile(emailTemplate, {
           name: employee.name,
-          payPeriod: `${payrollRun.period_start} to ${payrollRun.period_end}`,
+          employeeName: employee.name,
+          periodStart: payrollRun.period_start,
+          periodEnd: payrollRun.period_end,
+          payDate: payrollRun.pay_date,
           hoursWorked: employee.payrollItem.hours_worked,
           grossPay: employee.payrollItem.gross_pay,
           socialSecurity: employee.payrollItem.social_security_employee,
           medicalBenefits: employee.payrollItem.medical_benefits_employee,
           educationLevy: employee.payrollItem.education_levy,
+          loanDeduction: employee.payrollItem.loan_deduction || 0,
           netPay: employee.payrollItem.net_pay
         });
         
