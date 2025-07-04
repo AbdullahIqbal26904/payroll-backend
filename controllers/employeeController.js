@@ -23,17 +23,36 @@ exports.addEmployee = async (req, res) => {
     hourly_rate,
     payment_frequency,
     is_exempt_ss,
-    is_exempt_medical
+    is_exempt_medical,
+    employee_id
   } = req.body;
   
   try {
     // Start transaction
     await db.query('START TRANSACTION');
     
-    // Generate employee ID
-    const currentYear = new Date().getFullYear();
-    const randomPart = Math.floor(1000 + Math.random() * 9000);
-    const employeeId = `EMP-${currentYear}-${randomPart}`;
+    // Validate employee_id is provided
+    if (!employee_id) {
+      await db.query('ROLLBACK');
+      return res.status(400).json({
+        success: false,
+        message: 'Employee ID is required'
+      });
+    }
+    
+    // Check if employee_id already exists
+    const [existingEmployee] = await db.query(
+      'SELECT * FROM employees WHERE employee_id = ?',
+      [employee_id]
+    );
+    
+    if (existingEmployee.length > 0) {
+      await db.query('ROLLBACK');
+      return res.status(400).json({
+        success: false,
+        message: 'An employee with this Employee ID already exists'
+      });
+    }
     
     // Calculate age for date_of_birth_for_age
     let dateOfBirthForAge = null;
@@ -84,7 +103,7 @@ exports.addEmployee = async (req, res) => {
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         userId, 
-        employeeId, 
+        employee_id, 
         first_name, 
         last_name, 
         date_of_birth, 

@@ -58,22 +58,24 @@ class Payroll {
           FROM 
             timesheet_entries te
           LEFT JOIN 
-            employees e ON CONCAT(e.first_name, ' ', e.last_name) LIKE CONCAT('%', te.first_name, ' ', te.last_name, '%')
+            employees e ON te.employee_id = e.employee_id
           WHERE 
             te.period_id = ?`,
           [periodId]
         );
         
-        // Group entries by employee
+        // Group entries by employee ID (primary) or name (fallback)
         const employeeHours = {};
         
         timesheetEntries.forEach(entry => {
-          const key = `${entry.last_name}_${entry.first_name}`;
+          // Use employee_id as the primary key if available
+          const key = entry.employee_id || `${entry.last_name}_${entry.first_name}`;
           
           if (!employeeHours[key]) {
             employeeHours[key] = {
               firstName: entry.first_name,
               lastName: entry.last_name,
+              employeeId: entry.employee_id,
               employeeDbId: entry.employee_db_id,
               totalHours: 0,
               entries: []
@@ -96,7 +98,7 @@ class Payroll {
           const employee = employeeHours[employeeKey];
           
           try {
-            console.log(`Processing employee: ${employee.firstName} ${employee.lastName}, Total Hours: ${employee.totalHours}`);
+            console.log(`Processing employee: ${employee.firstName} ${employee.lastName} (ID: ${employee.employeeId}), Total Hours: ${employee.totalHours}`);
             
             // Get employee details from database if possible
             let employeeData = null;
@@ -110,6 +112,18 @@ class Payroll {
               if (employees.length > 0) {
                 employeeData = employees[0];
                 console.log(`Employee data found: ${employeeData.first_name} ${employeeData.last_name}, Salary: ${employeeData.salary_amount}, Rate: ${employeeData.hourly_rate}, Frequency: ${employeeData.payment_frequency}`);
+              }
+            }
+            // If we didn't find by database ID, try looking up by employee number
+            else if (employee.employeeId) {
+              const [employees] = await connection.query(
+                `SELECT * FROM employees WHERE employee_id = ?`,
+                [employee.employeeId]
+              );
+              
+              if (employees.length > 0) {
+                employeeData = employees[0];
+                console.log(`Employee data found by employee number: ${employeeData.first_name} ${employeeData.last_name}, Salary: ${employeeData.salary_amount}, Rate: ${employeeData.hourly_rate}, Frequency: ${employeeData.payment_frequency}`);
               }
             }
             
@@ -136,26 +150,38 @@ class Payroll {
             // Calculate gross pay based on either hourly rate or salary
             let grossPay = 0;
             
-            if (employeeData.hourly_rate && employeeData.hourly_rate > 0) {
-              // If hourly rate is set, calculate based on hours worked
-              grossPay = employee.totalHours * employeeData.hourly_rate;
-              console.log(`Calculated hourly pay: ${employee.totalHours} hours * ${employeeData.hourly_rate} rate = ${grossPay}`);
-            } else if (employeeData.salary_amount && employeeData.salary_amount > 0) {
-              // If salary is set, use the salary amount based on payment frequency
-              if (employeeData.payment_frequency === 'Bi-Weekly') {
-                // For bi-weekly payment, convert monthly salary to bi-weekly
-                // Assuming 26 pay periods per year (52 weeks / 2)
-                const biWeeklySalary = (employeeData.salary_amount * 12) / 26;
-                grossPay = biWeeklySalary;
-              } else {
-                // Monthly pay is the full salary amount
-                grossPay = employeeData.salary_amount;
+            try {
+              if (employeeData.hourly_rate && parseFloat(employeeData.hourly_rate) > 0) {
+                // If hourly rate is set, calculate based on hours worked
+                grossPay = employee.totalHours * parseFloat(employeeData.hourly_rate);
+                console.log(`Calculated hourly pay: ${employee.totalHours} hours * ${employeeData.hourly_rate} rate = ${grossPay}`);
+              } else if (employeeData.salary_amount && parseFloat(employeeData.salary_amount) > 0) {
+                // If salary is set, use the salary amount based on payment frequency
+                if (employeeData.payment_frequency === 'Bi-Weekly') {
+                  // For bi-weekly payment, convert monthly salary to bi-weekly
+                  // Assuming 26 pay periods per year (52 weeks / 2)
+                  const biWeeklySalary = (parseFloat(employeeData.salary_amount) * 12) / 26;
+                  grossPay = biWeeklySalary;
+                } else {
+                  // Monthly pay is the full salary amount
+                  grossPay = parseFloat(employeeData.salary_amount);
+                }
+                console.log(`Using salary amount: ${employeeData.salary_amount}, payment frequency: ${employeeData.payment_frequency}, calculated: ${grossPay}`);
               }
-              console.log(`Using salary amount: ${employeeData.salary_amount}, payment frequency: ${employeeData.payment_frequency}, calculated: ${grossPay}`);
+              
+              // Ensure grossPay is a valid number
+              if (isNaN(grossPay)) {
+                console.log(`Warning: Calculated grossPay is not a number for ${employeeData.first_name} ${employeeData.last_name}, setting to 0`);
+                grossPay = 0;
+              }
+            } catch (calcError) {
+              console.error(`Error calculating gross pay: ${calcError.message}`);
+              grossPay = 0;
             }
             
             // Ensure gross pay is never negative and is properly rounded
-            grossPay = Math.max(0, parseFloat(grossPay.toFixed(2)));
+            // First ensure grossPay is a number before using toFixed
+            grossPay = typeof grossPay === 'number' ? Math.max(0, parseFloat(grossPay.toFixed(2))) : 0;
             
             // Calculate age for benefits determination
             const age = employeeData.date_of_birth 
@@ -198,7 +224,7 @@ class Payroll {
               ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
               [
                 payrollRunId,
-                employeeData.id,
+                employeeData.employeeId,
                 `${employeeData.first_name} ${employeeData.last_name}`,
                 employee.totalHours,
                 grossPay,
@@ -222,6 +248,15 @@ class Payroll {
                 options.payDate || new Date()
               );
             }
+            
+            // Add the successfully processed employee to our list
+            payrollItems.push({
+              id: payrollItem.insertId,
+              employeeName: `${employeeData.first_name} ${employeeData.last_name}`,
+              employeeId: employeeData.id,
+              grossPay,
+              netPay: deductions.netPay
+            });
             
           } catch (error) {
             console.error(`Error processing employee ${employeeKey}:`, error);

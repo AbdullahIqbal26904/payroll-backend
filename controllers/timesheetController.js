@@ -18,10 +18,15 @@ const parseDate = function(dateString) {
   // Try to parse the date (handle different formats)
   let date;
   
-  // Try M/D/YYYY format
+  // Try M/D/YYYY format (both MM/DD/YYYY and M/D/YYYY)
   try {
+    // First try MM/dd/yyyy format
     date = parse(dateString.trim(), 'MM/dd/yyyy', new Date());
-    if (isNaN(date.getTime())) throw new Error('Invalid date');
+    if (isNaN(date.getTime())) {
+      // If that fails, try M/d/yyyy format
+      date = parse(dateString.trim(), 'M/d/yyyy', new Date());
+      if (isNaN(date.getTime())) throw new Error('Invalid date');
+    }
     return date.toISOString().split('T')[0];
   } catch (e) {
     // Try other formats if needed
@@ -118,7 +123,7 @@ exports.uploadTimesheet = async (req, res) => {
     }
     
     // Read the CSV data starting from line 3 (headers)
-    const columnHeaders = lines[2].split('\t');
+    const columnHeaders = lines[2].split(',').map(header => header.replace(/^"|"$/g, '').trim());
     console.log('Column Headers:', columnHeaders);
     
     // Process the actual data rows
@@ -126,27 +131,50 @@ exports.uploadTimesheet = async (req, res) => {
       const line = lines[i].trim();
 
       if (!line) continue; // Skip empty lines
-    //   console.log(line)
+      
       try {
         // Check if the line has tabs
         let values;
         if (line.includes('\t')) {
           values = line.split('\t');
         } else {
-          // If not tab-delimited, try parsing as CSV
-          // Remove quotes and split by commas
-          const csvLine = line.replace(/^"|"$/g, '').replace(/","/g, '","');
-          values = csvLine.split('","');
-          // Clean up any remaining quotes
-          values = values.map(val => val.replace(/^"|"$/g, ''));
+          // For CSV format with quotes around each field
+          // First, attempt to handle standard CSV with quoted fields
+          let parsedValues = [];
+          
+          // Pattern to match CSV fields (handles quoted fields with commas inside them)
+          const pattern = /("([^"]*)"|([^,]*))(,|$)/g;
+          let match;
+          
+          while ((match = pattern.exec(line)) !== null) {
+            // The captured value is either in group 2 (with quotes) or group 3 (without quotes)
+            const value = match[2] !== undefined ? match[2] : match[3] || '';
+            parsedValues.push(value.trim());
+            
+            // If the match ends at the end of the string, break
+            if (match.index + match[0].length >= line.length) break;
+          }
+          
+          values = parsedValues;
+          
+          // If parsing failed or produced unexpected results, fallback to simple split
+          if (values.length < 3) {
+            const regex = /,(?=(?:(?:[^"]*"){2})*[^"]*$)/;
+            values = line.split(regex);
+            values = values.map(val => val.replace(/^"|"$/g, '').trim());
+          }
         }
         console.log('values: ',values);
         
-        // Create timesheet entry
+        // Create timesheet entry with employee number as the primary identifier
+        if (!values[3]) {
+          throw new Error('Missing date field');
+        }
+        
         const timeEntry = {
           lastName: values[0],
           firstName: values[1],
-          employeeId: values[2] || null,
+          employeeId: values[2], // Using the employee number (EMP##) as the unique identifier
           date: parseDate(values[3]),
           timeIn: values[4] || null,
           timeOut: values[5] || null,
@@ -163,7 +191,8 @@ exports.uploadTimesheet = async (req, res) => {
         
         console.log('Processed entry:', 
           timeEntry.lastName, 
-          timeEntry.firstName, 
+          timeEntry.firstName,
+          timeEntry.employeeId, // Added employee ID to log
           timeEntry.date, 
           timeEntry.totalHours, 
           timeEntry.hoursDecimal
@@ -203,6 +232,7 @@ exports.uploadTimesheet = async (req, res) => {
       }
     } else {
       return res.status(400).json(formatError({
+
         message: 'No valid timesheet entries found in the CSV file',
         errors
       }));
