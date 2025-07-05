@@ -2,7 +2,16 @@
 
 ## Overview
 
-This document outlines the API endpoints for Phase 2 of the MSA Payroll System for Antigua. In this phase, we've implemented:
+This document outlines the API en    "data": {
+    "id": 1,
+    "employee_id": "EMP001",
+    "employee_name": "John Doe",
+    "loan_amount": 5000.00,
+    "interest_rate": 5.5,
+    "total_payable": 5275.00,
+    "installment_amount": 250.00,
+    "remaining_balance": 3935.00,
+    "start_date": "2025-05-01",r Phase 2 of the MSA Payroll System for Antigua. In this phase, we've implemented:
 
 1. CSV timesheet import with the specific format from Attend Time Clock
 2. Payroll calculation based on Antigua's rules for:
@@ -44,7 +53,7 @@ Retrieve a list of all employee loans with pagination and optional filtering.
 | --------- | ---- | ----------- |
 | page | Number | Page number (default: 1) |
 | limit | Number | Items per page (default: 10) |
-| employeeId | Number | Filter loans by employee ID (optional) |
+| employeeId | String | Filter loans by employee ID (optional) |
 | status | String | Filter loans by status (e.g., 'active', 'paid', 'defaulted') (optional) |
 
 **Success Response:**
@@ -56,7 +65,7 @@ Retrieve a list of all employee loans with pagination and optional filtering.
     "loans": [
       {
         "id": 1,
-        "employee_id": 5,
+        "employee_id": "EMP001",
         "employee_name": "John Doe",
         "loan_amount": 5000.00,
         "interest_rate": 5.5,
@@ -147,7 +156,7 @@ Create a new employee loan record.
 **Request Body:**
 ```json
 {
-  "employee_id": 5,
+  "employee_id": "EMP001",
   "loan_amount": 5000.00,
   "interest_rate": 5.5,
   "installment_amount": 220.00,
@@ -158,7 +167,7 @@ Create a new employee loan record.
 ```
 
 **Required Fields:**
-- `employee_id` - ID of the employee receiving the loan
+- `employee_id` - ID of the employee receiving the loan (matches the `id` field in employees table)
 - `loan_amount` - Principal amount of the loan
 - `interest_rate` - Annual interest rate (percentage)
 - `installment_amount` - Amount to be deducted per pay period
@@ -175,7 +184,7 @@ Create a new employee loan record.
   "message": "Employee loan created successfully",
   "data": {
     "id": 1,
-    "employee_id": 5,
+    "employee_id": "EMP001",
     "loan_amount": 5000.00,
     "interest_rate": 5.5,
     "total_payable": 5275.00,
@@ -272,7 +281,7 @@ Retrieve all loans associated with a specific employee.
     "loans": [
       {
         "id": 1,
-        "employee_id": 5,
+        "employee_id": "EMP001",
         "employee_name": "John Doe",
         "loan_amount": 5000.00,
         "interest_rate": 5.5,
@@ -286,7 +295,7 @@ Retrieve all loans associated with a specific employee.
       },
       {
         "id": 3,
-        "employee_id": 5,
+        "employee_id": "EMP001",
         "employee_name": "John Doe",
         "loan_amount": 1000.00,
         "interest_rate": 3.0,
@@ -557,7 +566,7 @@ Retrieve details of a specific payroll run including all employee items.
       {
         "id": 1,
         "payroll_run_id": 1,
-        "employee_id": 1,
+        "employee_id": "EMP001",
         "employee_name": "Yajaira Garcia",
         "hours_worked": 51.45,
         "gross_pay": 1543.50,
@@ -586,7 +595,7 @@ Generate and download a PDF paystub for a specific employee.
 | Parameter | Description |
 | --------- | ----------- |
 | payrollRunId | ID of the payroll run |
-| employeeId | ID of the employee |
+| employeeId | ID of the employee (matches the `id` field in employees table) |
 
 **Success Response:**
 - Content-Type: application/pdf
@@ -607,7 +616,7 @@ Send paystubs via email to selected employees or all employees in a payroll run.
 {
   "payrollRunId": 1,
   "sendToAll": true,
-  "employeeIds": []
+  "employeeIds": [] // Array of employee IDs (matches the id field in employees table)
 }
 ```
 
@@ -621,7 +630,7 @@ Send paystubs via email to selected employees or all employees in a payroll run.
     "totalFailed": 0,
     "results": [
       {
-        "employeeId": 1,
+        "employeeId": "EMP001",
         "employeeName": "Yajaira Garcia",
         "email": "yajaira.garcia@example.com",
         "messageId": "<abc123@example.com>",

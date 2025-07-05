@@ -24,9 +24,8 @@ async function up(connection) {
   // Create employees table with proper constraints and indexes
   await connection.query(`
     CREATE TABLE employees (
-      id INT AUTO_INCREMENT PRIMARY KEY,
+      id VARCHAR(20) PRIMARY KEY,
       user_id INT,
-      employee_id VARCHAR(20) UNIQUE,
       first_name VARCHAR(50) NOT NULL,
       last_name VARCHAR(50) NOT NULL,
       date_of_birth DATE,
@@ -46,7 +45,6 @@ async function up(connection) {
       FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL,
       
       -- Add indexes for improved query performance
-      INDEX idx_employee_id (employee_id),
       INDEX idx_name (last_name, first_name),
       INDEX idx_department (department),
       INDEX idx_hire_date (hire_date)

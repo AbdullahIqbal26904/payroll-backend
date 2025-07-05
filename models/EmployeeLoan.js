@@ -17,7 +17,7 @@ class EmployeeLoan {
       const offset = (page - 1) * limit;
       
       let query = `
-        SELECT l.*, e.first_name, e.last_name, e.employee_id
+        SELECT l.*, e.first_name, e.last_name
         FROM employee_loans l
         JOIN employees e ON l.employee_id = e.id
       `;
@@ -76,7 +76,7 @@ class EmployeeLoan {
   static async getLoanById(id) {
     try {
       const [loans] = await db.query(`
-        SELECT l.*, e.first_name, e.last_name, e.employee_id
+        SELECT l.*, e.first_name, e.last_name
         FROM employee_loans l
         JOIN employees e ON l.employee_id = e.id
         WHERE l.id = ?
@@ -257,7 +257,7 @@ class EmployeeLoan {
   
   /**
    * Get active loans for an employee
-   * @param {number} employeeId - Employee ID
+   * @param {string} employeeId - Employee ID
    * @returns {Promise<Array>} Active loans for employee
    */
   static async getActiveLoansForEmployee(employeeId) {

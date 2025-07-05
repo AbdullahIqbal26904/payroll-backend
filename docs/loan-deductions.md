@@ -14,7 +14,7 @@ The loan functionality is supported by the following database tables:
 
 1. **employee_loans**: Stores the main loan information
    - `id`: Unique identifier for the loan
-   - `employee_id`: Reference to the employee
+   - `employee_id`: Reference to the employee's id in the employees table
    - `loan_amount`: Original amount of the loan
    - `interest_rate`: Percentage of interest charged
    - `total_amount`: Total amount including interest to be repaid

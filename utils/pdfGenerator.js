@@ -41,11 +41,9 @@ const generatePaystubPDF = async (payrollItem, periodData, options = {}) => {
       doc.fontSize(12).font('Helvetica-Bold').text('Employee Information');
       doc.fontSize(10).font('Helvetica');
       const employeeName = payrollItem.employeeName || payrollItem.employee_name || 'Unknown Employee';
-      const employeeId = payrollItem.employeeId || payrollItem.employee_id;
+      const employeeId = payrollItem.employeeId || payrollItem.employee_id || payrollItem.employee_number;
       doc.text(`Name: ${employeeName}`);
-      if (employeeId) {
-        doc.text(`Employee ID: ${employeeId}`);
-      }
+      doc.text(`Employee ID: ${employeeId || 'N/A'}`);
       doc.moveDown();
       
       // Add earnings section
@@ -75,8 +73,11 @@ const generatePaystubPDF = async (payrollItem, periodData, options = {}) => {
       // Log data for debugging
       console.log('PDF Generation - Payroll Item:', {
         employeeName: payrollItem.employee_name || payrollItem.employeeName,
+        employeeId: payrollItem.employeeId || payrollItem.employee_id || payrollItem.employee_number,
         grossPay: payrollItem.grossPay || payrollItem.gross_pay,
-        hoursWorked: hoursWorked
+        hoursWorked: hoursWorked,
+        loanDeduction: payrollItem.loanDeduction || payrollItem.loan_deduction,
+        hasLoanDetails: options.loanDetails ? true : false
       });
       
       const grossPay = parseFloat(payrollItem.grossPay || payrollItem.gross_pay || 0).toFixed(2);
@@ -210,28 +211,47 @@ const generatePaystubPDF = async (payrollItem, periodData, options = {}) => {
         .text(`$${totalEmployerContributions.toFixed(2)}`, 50 + colWidth * 2, doc.y - doc.currentLineHeight(), { width: colWidth, align: 'right' });
       
       // Add Employee Loan Breakdown if applicable
-      if (parseFloat(loanDeduction) > 0 && options.loanDetails) {
+      if (parseFloat(loanDeduction) > 0) {
         doc.moveDown(1.5);
         doc.fontSize(12).font('Helvetica-Bold').text('Employee Loan Breakdown');
         doc.moveDown(0.5);
         
-        const loan = options.loanDetails;
-        
-        doc.font('Helvetica').fontSize(10);
-        doc.text(`Original Loan Amount: $${parseFloat(loan.loan_amount).toFixed(2)}`, 50, doc.y);
-        doc.text(`Interest Rate: ${parseFloat(loan.interest_rate).toFixed(2)}%`, 50, doc.y);
-        doc.text(`Total Amount with Interest: $${parseFloat(loan.total_amount).toFixed(2)}`, 50, doc.y);
-        doc.text(`Remaining Balance: $${parseFloat(loan.remaining_amount).toFixed(2)}`, 50, doc.y);
-        doc.text(`Payment Amount: $${parseFloat(loan.installment_amount).toFixed(2)} per pay period`, 50, doc.y);
-        
-        if (loan.start_date) {
-          const startDate = new Date(loan.start_date);
-          doc.text(`Loan Start Date: ${startDate.toLocaleDateString()}`, 50, doc.y);
-        }
-        
-        if (loan.expected_end_date) {
-          const endDate = new Date(loan.expected_end_date);
-          doc.text(`Expected End Date: ${endDate.toLocaleDateString()}`, 50, doc.y);
+        // First check if we have detailed loan information
+        if (options.loanDetails) {
+          // Ensure all values are properly handled to avoid null reference errors
+          const loan = options.loanDetails;
+          
+          console.log(`Rendering loan details: ${JSON.stringify(loan)}`);
+          
+          doc.font('Helvetica').fontSize(10);
+          
+          // Safely parse and format loan values
+          const loanAmount = loan.loan_amount ? parseFloat(loan.loan_amount).toFixed(2) : '0.00';
+          const interestRate = loan.interest_rate ? parseFloat(loan.interest_rate).toFixed(2) : '0.00';
+          const totalAmount = loan.total_amount ? parseFloat(loan.total_amount).toFixed(2) : '0.00';
+          const remainingAmount = loan.remaining_amount ? parseFloat(loan.remaining_amount).toFixed(2) : '0.00';
+          const installmentAmount = loan.installment_amount ? parseFloat(loan.installment_amount).toFixed(2) : '0.00';
+          
+          doc.text(`Original Loan Amount: $${loanAmount}`, 50, doc.y);
+          doc.text(`Interest Rate: ${interestRate}%`, 50, doc.y);
+          doc.text(`Total Amount with Interest: $${totalAmount}`, 50, doc.y);
+          doc.text(`Remaining Balance: $${remainingAmount}`, 50, doc.y);
+          doc.text(`Payment Amount: $${installmentAmount} per pay period`, 50, doc.y);
+          
+          if (loan.start_date) {
+            const startDate = new Date(loan.start_date);
+            doc.text(`Loan Start Date: ${startDate.toLocaleDateString()}`, 50, doc.y);
+          }
+          
+          if (loan.expected_end_date) {
+            const endDate = new Date(loan.expected_end_date);
+            doc.text(`Expected End Date: ${endDate.toLocaleDateString()}`, 50, doc.y);
+          }
+        } else {
+          // If we don't have detailed loan information, just show the current deduction
+          doc.font('Helvetica').fontSize(10);
+          doc.text(`Current Loan Deduction: $${loanDeduction}`, 50, doc.y);
+          doc.text(`No detailed loan information available.`, 50, doc.y);
         }
         
         doc.moveDown();

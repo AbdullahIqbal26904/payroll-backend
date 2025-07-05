@@ -408,11 +408,28 @@ exports.downloadPaystub = async (req, res) => {
     if (payrollItem.loan_deduction && parseFloat(payrollItem.loan_deduction) > 0) {
       // Get active loans for this employee
       const EmployeeLoan = require('../models/EmployeeLoan');
-      const activeLoans = await EmployeeLoan.getActiveLoansForEmployee(employeeId);
+      
+      // First try with the employeeId parameter (which might be the payroll_item id)
+      let activeLoans = [];
+      
+      if (payrollItem.employee_id) {
+        // If we have the employee_id in the payroll item, use that
+        console.log(`Looking up loans for employee_id: ${payrollItem.employee_id}`);
+        activeLoans = await EmployeeLoan.getActiveLoansForEmployee(payrollItem.employee_id);
+      } 
+      
+      // If no loans found and employeeId is not the same as payrollItem.employee_id, try with that
+      if (activeLoans.length === 0 && employeeId && employeeId !== payrollItem.employee_id) {
+        console.log(`Looking up loans for employeeId parameter: ${employeeId}`);
+        activeLoans = await EmployeeLoan.getActiveLoansForEmployee(employeeId);
+      }
       
       if (activeLoans && activeLoans.length > 0) {
         // Just get the first active loan for now - could be enhanced to match specific loan
         loanDetails = activeLoans[0];
+        console.log(`Found loan details: ${JSON.stringify(loanDetails)}`);
+      } else {
+        console.log(`No active loans found for employee: ${employeeId}`);
       }
     }
 

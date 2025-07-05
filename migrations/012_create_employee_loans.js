@@ -11,7 +11,7 @@ async function up(connection) {
     await connection.query(`
       CREATE TABLE IF NOT EXISTS employee_loans (
         id INT AUTO_INCREMENT PRIMARY KEY,
-        employee_id INT NOT NULL,
+        employee_id VARCHAR(20) NOT NULL,
         loan_amount DECIMAL(10, 2) NOT NULL,
         interest_rate DECIMAL(5, 2) NOT NULL,
         total_amount DECIMAL(10, 2) NOT NULL,
@@ -24,7 +24,7 @@ async function up(connection) {
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         FOREIGN KEY (employee_id) REFERENCES employees(id) ON DELETE CASCADE
-      )
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     `);
     
     console.log('Created employee_loans table');
@@ -40,7 +40,7 @@ async function up(connection) {
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (loan_id) REFERENCES employee_loans(id) ON DELETE CASCADE,
         FOREIGN KEY (payroll_item_id) REFERENCES payroll_items(id) ON DELETE CASCADE
-      )
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     `);
     
     console.log('Created loan_payments table');

@@ -58,7 +58,7 @@ class Payroll {
           FROM 
             timesheet_entries te
           LEFT JOIN 
-            employees e ON te.employee_id = e.employee_id
+            employees e ON te.employee_id = e.id
           WHERE 
             te.period_id = ?`,
           [periodId]
@@ -117,7 +117,7 @@ class Payroll {
             // If we didn't find by database ID, try looking up by employee number
             else if (employee.employeeId) {
               const [employees] = await connection.query(
-                `SELECT * FROM employees WHERE employee_id = ?`,
+                `SELECT * FROM employees WHERE id = ?`,
                 [employee.employeeId]
               );
               
@@ -224,7 +224,7 @@ class Payroll {
               ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
               [
                 payrollRunId,
-                employeeData.employeeId,
+                employeeData.id,
                 `${employeeData.first_name} ${employeeData.last_name}`,
                 employee.totalHours,
                 grossPay,

@@ -40,9 +40,9 @@ exports.addEmployee = async (req, res) => {
       });
     }
     
-    // Check if employee_id already exists
+    // Check if id already exists
     const [existingEmployee] = await db.query(
-      'SELECT * FROM employees WHERE employee_id = ?',
+      'SELECT * FROM employees WHERE id = ?',
       [employee_id]
     );
     
@@ -50,7 +50,7 @@ exports.addEmployee = async (req, res) => {
       await db.query('ROLLBACK');
       return res.status(400).json({
         success: false,
-        message: 'An employee with this Employee ID already exists'
+        message: 'An employee with this ID already exists'
       });
     }
     
@@ -97,13 +97,13 @@ exports.addEmployee = async (req, res) => {
     // Create employee record
     const [result] = await db.query(
       `INSERT INTO employees 
-       (user_id, employee_id, first_name, last_name, date_of_birth, gender, address, phone, email,
+       (id, user_id, first_name, last_name, date_of_birth, gender, address, phone, email,
         hire_date, job_title, department, salary_amount, hourly_rate, payment_frequency, 
         is_exempt_ss, is_exempt_medical, date_of_birth_for_age) 
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
+        employee_id,
         userId, 
-        employee_id, 
         first_name, 
         last_name, 
         date_of_birth, 
@@ -129,7 +129,7 @@ exports.addEmployee = async (req, res) => {
     // Get created employee
     const [newEmployee] = await db.query(
       'SELECT * FROM employees WHERE id = ?',
-      [result.insertId]
+      [employee_id]
     );
     
     res.status(201).json(formatSuccess('Employee added successfully', newEmployee[0]));
@@ -161,8 +161,8 @@ exports.getEmployees = async (req, res) => {
     
     if (req.query.search) {
       const searchTerm = `%${req.query.search}%`;
-      query += ' WHERE employee_id LIKE ? OR first_name LIKE ? OR last_name LIKE ? OR job_title LIKE ? OR department LIKE ?';
-      countQuery += ' WHERE employee_id LIKE ? OR first_name LIKE ? OR last_name LIKE ? OR job_title LIKE ? OR department LIKE ?';
+      query += ' WHERE id LIKE ? OR first_name LIKE ? OR last_name LIKE ? OR job_title LIKE ? OR department LIKE ?';
+      countQuery += ' WHERE id LIKE ? OR first_name LIKE ? OR last_name LIKE ? OR job_title LIKE ? OR department LIKE ?';
       queryParams = [searchTerm, searchTerm, searchTerm, searchTerm, searchTerm];
     }
     

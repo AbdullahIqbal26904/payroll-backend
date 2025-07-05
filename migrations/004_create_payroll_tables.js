@@ -61,7 +61,7 @@ async function up(connection) {
       CREATE TABLE payroll_items (
         id INT AUTO_INCREMENT PRIMARY KEY,
         payroll_run_id INT,
-        employee_id INT NULL,
+        employee_id VARCHAR(20) NULL,
         employee_name VARCHAR(200) NOT NULL,
         hours_worked DECIMAL(10, 2) DEFAULT 0.00,
         gross_pay DECIMAL(10, 2) DEFAULT 0.00,
@@ -93,7 +93,7 @@ async function up(connection) {
     await connection.query(`
       CREATE TABLE payrolls (
         id INT AUTO_INCREMENT PRIMARY KEY,
-        employee_id INT,
+        employee_id VARCHAR(20),
         pay_period_start DATE,
         pay_period_end DATE,
         payment_date DATE,

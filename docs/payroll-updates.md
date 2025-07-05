@@ -72,7 +72,7 @@ The payroll calculation API now includes employer contributions in its output:
   "payrollItems": [
     {
       "id": 1,
-      "employeeId": 101,
+      "employeeId": "EMP101",
       "employeeName": "John Doe",
       "hoursWorked": 80,
       "grossPay": 1200.00,
