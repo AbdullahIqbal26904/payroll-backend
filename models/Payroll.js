@@ -1,5 +1,6 @@
 const db = require('../config/db');
 const EmployeeLoan = require('./EmployeeLoan');
+const VacationEntitlement = require('./VacationEntitlement');
 
 /**
  * @class Payroll
@@ -205,7 +206,37 @@ class Payroll {
             // Calculate deductions based on Antigua rules
             const deductions = this.calculateDeductions(grossPay, age, payrollSettings, employeeData.payment_frequency, employeeData, loanData);
             
-            // Save the payroll item
+            // Calculate YTD totals up to this pay date
+            let ytdTotals = {
+              ytd_gross_pay: 0,
+              ytd_social_security_employee: 0,
+              ytd_social_security_employer: 0,
+              ytd_medical_benefits_employee: 0,
+              ytd_medical_benefits_employer: 0,
+              ytd_education_levy: 0,
+              ytd_loan_deduction: 0,
+              ytd_net_pay: 0,
+              ytd_hours_worked: 0
+            };
+            
+            if (employeeData.id) {
+              // Get YTD totals before this payroll
+              const payDate = new Date(options.payDate || new Date());
+              ytdTotals = await this.calculateYTDTotals(employeeData.id, payDate);
+              
+              // Add current period amounts to YTD totals
+              ytdTotals.ytd_gross_pay += grossPay;
+              ytdTotals.ytd_social_security_employee += deductions.socialSecurityEmployee;
+              ytdTotals.ytd_social_security_employer += deductions.socialSecurityEmployer;
+              ytdTotals.ytd_medical_benefits_employee += deductions.medicalBenefitsEmployee;
+              ytdTotals.ytd_medical_benefits_employer += deductions.medicalBenefitsEmployer;
+              ytdTotals.ytd_education_levy += deductions.educationLevy;
+              ytdTotals.ytd_loan_deduction += (deductions.loanDeduction || 0);
+              ytdTotals.ytd_net_pay += deductions.netPay;
+              ytdTotals.ytd_hours_worked += employee.totalHours;
+            }
+            
+            // Save the payroll item with YTD totals
             const [payrollItem] = await connection.query(
               `INSERT INTO payroll_items (
                 payroll_run_id,
@@ -220,8 +251,17 @@ class Payroll {
                 education_levy,
                 loan_deduction,
                 total_employer_contributions,
-                net_pay
-              ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                net_pay,
+                ytd_gross_pay,
+                ytd_social_security_employee,
+                ytd_social_security_employer,
+                ytd_medical_benefits_employee,
+                ytd_medical_benefits_employer,
+                ytd_education_levy,
+                ytd_loan_deduction,
+                ytd_net_pay,
+                ytd_hours_worked
+              ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
               [
                 payrollRunId,
                 employeeData.id,
@@ -235,7 +275,16 @@ class Payroll {
                 deductions.educationLevy,
                 deductions.loanDeduction || 0,
                 deductions.totalEmployerContributions,
-                deductions.netPay
+                deductions.netPay,
+                ytdTotals.ytd_gross_pay,
+                ytdTotals.ytd_social_security_employee,
+                ytdTotals.ytd_social_security_employer,
+                ytdTotals.ytd_medical_benefits_employee,
+                ytdTotals.ytd_medical_benefits_employer,
+                ytdTotals.ytd_education_levy,
+                ytdTotals.ytd_loan_deduction,
+                ytdTotals.ytd_net_pay,
+                ytdTotals.ytd_hours_worked
               ]
             );
             
@@ -249,13 +298,31 @@ class Payroll {
               );
             }
             
+            // Update vacation accrual if employee exists in database
+            if (employeeData.id) {
+              try {
+                const payDate = new Date(options.payDate || new Date());
+                const year = payDate.getFullYear();
+                
+                // Update vacation accrual based on hours worked
+                await VacationEntitlement.updateAccrual(employeeData.id, employee.totalHours, year);
+                
+                // Update YTD summary table for efficient reporting
+                await this.updateYTDSummary(employeeData.id, ytdTotals, year);
+              } catch (vacationError) {
+                console.error(`Error updating vacation accrual for employee ${employeeData.id}:`, vacationError);
+                // Don't fail the entire payroll process for vacation accrual errors
+              }
+            }
+            
             // Add the successfully processed employee to our list
             payrollItems.push({
               id: payrollItem.insertId,
               employeeName: `${employeeData.first_name} ${employeeData.last_name}`,
               employeeId: employeeData.id,
               grossPay,
-              netPay: deductions.netPay
+              netPay: deductions.netPay,
+              ytdTotals
             });
             
           } catch (error) {
@@ -483,9 +550,17 @@ class Payroll {
       
       const run = runs[0];
       
-      // Get payroll items
+      // Get payroll items with YTD data
       const [items] = await db.query(
-        `SELECT * FROM payroll_items WHERE payroll_run_id = ?`,
+        `SELECT pi.*, 
+          e.first_name, e.last_name, e.hire_date,
+          ve.current_balance as vacation_balance,
+          ve.annual_pto_hours,
+          ve.accrual_rate_per_hour
+        FROM payroll_items pi
+        LEFT JOIN employees e ON pi.employee_id = e.id
+        LEFT JOIN employee_vacation_entitlements ve ON (e.id = ve.employee_id AND ve.year = YEAR(NOW()))
+        WHERE payroll_run_id = ?`,
         [id]
       );
       
@@ -528,6 +603,101 @@ class Payroll {
       );
       
       return runs;
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  /**
+   * Calculate Year-To-Date totals for an employee up to a specific date
+   * @param {string} employeeId - Employee ID
+   * @param {Date} upToDate - Calculate YTD up to this date
+   * @returns {Promise<Object>} YTD calculations
+   */
+  static async calculateYTDTotals(employeeId, upToDate) {
+    try {
+      const year = upToDate.getFullYear();
+      const startOfYear = new Date(year, 0, 1);
+      
+      // Get all payroll items for this employee from start of year up to the given date
+      const [ytdData] = await db.query(
+        `SELECT 
+          SUM(gross_pay) as ytd_gross_pay,
+          SUM(social_security_employee) as ytd_social_security_employee,
+          SUM(social_security_employer) as ytd_social_security_employer,
+          SUM(medical_benefits_employee) as ytd_medical_benefits_employee,
+          SUM(medical_benefits_employer) as ytd_medical_benefits_employer,
+          SUM(education_levy) as ytd_education_levy,
+          SUM(loan_deduction) as ytd_loan_deduction,
+          SUM(net_pay) as ytd_net_pay,
+          SUM(hours_worked) as ytd_hours_worked
+        FROM payroll_items pi
+        JOIN payroll_runs pr ON pi.payroll_run_id = pr.id
+        WHERE pi.employee_id = ? 
+        AND pr.pay_date >= ? 
+        AND pr.pay_date <= ?
+        AND pr.status IN ('completed', 'completed_with_errors', 'finalized')`,
+        [employeeId, startOfYear, upToDate]
+      );
+      
+      const result = ytdData[0] || {};
+      
+      // Convert null values to 0 and ensure proper formatting
+      return {
+        ytd_gross_pay: parseFloat(result.ytd_gross_pay || 0),
+        ytd_social_security_employee: parseFloat(result.ytd_social_security_employee || 0),
+        ytd_social_security_employer: parseFloat(result.ytd_social_security_employer || 0),
+        ytd_medical_benefits_employee: parseFloat(result.ytd_medical_benefits_employee || 0),
+        ytd_medical_benefits_employer: parseFloat(result.ytd_medical_benefits_employer || 0),
+        ytd_education_levy: parseFloat(result.ytd_education_levy || 0),
+        ytd_loan_deduction: parseFloat(result.ytd_loan_deduction || 0),
+        ytd_net_pay: parseFloat(result.ytd_net_pay || 0),
+        ytd_hours_worked: parseFloat(result.ytd_hours_worked || 0)
+      };
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  /**
+   * Update YTD summary table for efficient lookups
+   * @param {string} employeeId - Employee ID
+   * @param {Object} ytdData - YTD data to update
+   * @param {number} year - Year
+   * @returns {Promise<void>}
+   */
+  static async updateYTDSummary(employeeId, ytdData, year) {
+    try {
+      await db.query(
+        `INSERT INTO employee_ytd_summary 
+        (employee_id, year, ytd_gross_pay, ytd_social_security_employee, 
+         ytd_social_security_employer, ytd_medical_benefits_employee, 
+         ytd_medical_benefits_employer, ytd_education_levy, ytd_loan_deduction, 
+         ytd_net_pay, ytd_hours_worked) 
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON DUPLICATE KEY UPDATE 
+        ytd_gross_pay = VALUES(ytd_gross_pay),
+        ytd_social_security_employee = VALUES(ytd_social_security_employee),
+        ytd_social_security_employer = VALUES(ytd_social_security_employer),
+        ytd_medical_benefits_employee = VALUES(ytd_medical_benefits_employee),
+        ytd_medical_benefits_employer = VALUES(ytd_medical_benefits_employer),
+        ytd_education_levy = VALUES(ytd_education_levy),
+        ytd_loan_deduction = VALUES(ytd_loan_deduction),
+        ytd_net_pay = VALUES(ytd_net_pay),
+        ytd_hours_worked = VALUES(ytd_hours_worked)`,
+        [
+          employeeId, year,
+          ytdData.ytd_gross_pay,
+          ytdData.ytd_social_security_employee,
+          ytdData.ytd_social_security_employer,
+          ytdData.ytd_medical_benefits_employee,
+          ytdData.ytd_medical_benefits_employer,
+          ytdData.ytd_education_levy,
+          ytdData.ytd_loan_deduction,
+          ytdData.ytd_net_pay,
+          ytdData.ytd_hours_worked
+        ]
+      );
     } catch (error) {
       throw error;
     }

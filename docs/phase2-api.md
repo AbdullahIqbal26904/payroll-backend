@@ -21,6 +21,8 @@ This document outlines the API en    "data": {
 3. PDF paystub generation
 4. Email delivery of paystubs to employees
 5. Employee loan management with payroll deductions
+6. Year-To-Date (YTD) tracking for all earnings and deductions
+7. Vacation entitlement management with accrual tracking
 
 ## Authentication
 
@@ -770,3 +772,265 @@ The payroll calculation follows these specific Antigua rules:
   - For any amount over $5,000: (Amount over $5,000) × 5%
   - Sum both amounts for total Education Levy
 - Employers do not contribute to Education Levy
+
+## Vacation Entitlement System
+
+The system automatically calculates vacation accrual based on hours worked:
+
+### Accrual Calculation
+- Annual PTO hours are divided by total annual work hours (2080) to find the accrual rate per hour
+- Employees accrue vacation time for every hour worked
+- Example: 80 annual PTO hours ÷ 2080 work hours = 0.038462 hours accrued per hour worked
+
+### Vacation Management
+- Employees can request vacation time through the system
+- Requests require approval from administrators
+- The system tracks vacation balance, used time, and pending requests
+- Vacation balances are displayed on paystubs
+
+### Vacation API Endpoints
+
+#### Get Vacation Summary
+
+Get vacation entitlement summary for a specific employee.
+
+- **URL:** `/vacation/summary/:employeeId`
+- **Method:** `GET`
+- **Auth required:** Yes (Admin or Employee's own data)
+- **Query Parameters:**
+  - `year` (optional): Year to get summary for (defaults to current year)
+
+**Success Response:**
+```json
+{
+  "success": true,
+  "message": "Vacation summary retrieved successfully",
+  "data": {
+    "entitlement": {
+      "id": 1,
+      "employee_id": "EMP001",
+      "annual_pto_hours": 80.00,
+      "accrual_rate_per_hour": 0.038462,
+      "total_earned_current_year": 45.50,
+      "total_used_current_year": 16.00,
+      "current_balance": 29.50,
+      "year": 2025
+    },
+    "pendingHours": 8.00,
+    "availableBalance": 21.50
+  }
+}
+```
+
+#### Initialize Vacation Entitlement
+
+Initialize or update vacation entitlement for an employee.
+
+- **URL:** `/vacation/initialize`
+- **Method:** `POST`
+- **Auth required:** Yes (Admin only)
+
+**Request Body:**
+```json
+{
+  "employeeId": "EMP001",
+  "year": 2025,
+  "annualPtoHours": 80
+}
+```
+
+**Success Response:**
+```json
+{
+  "success": true,
+  "message": "Vacation entitlement initialized successfully",
+  "data": {
+    "id": 1,
+    "employee_id": "EMP001",
+    "annual_pto_hours": 80.00,
+    "accrual_rate_per_hour": 0.038462,
+    "total_earned_current_year": 0.00,
+    "total_used_current_year": 0.00,
+    "current_balance": 0.00,
+    "year": 2025
+  }
+}
+```
+
+#### Create Vacation Request
+
+Create a new vacation request.
+
+- **URL:** `/vacation/request`
+- **Method:** `POST`
+- **Auth required:** Yes (Admin or Employee's own request)
+
+**Request Body:**
+```json
+{
+  "employeeId": "EMP001",
+  "startDate": "2025-08-01",
+  "endDate": "2025-08-03",
+  "totalHours": 24,
+  "notes": "Family vacation"
+}
+```
+
+**Success Response:**
+```json
+{
+  "success": true,
+  "message": "Vacation request created successfully",
+  "data": {
+    "id": 1,
+    "employee_id": "EMP001",
+    "start_date": "2025-08-01",
+    "end_date": "2025-08-03",
+    "total_hours": 24.00,
+    "notes": "Family vacation",
+    "status": "pending",
+    "request_date": "2025-07-10T15:30:00.000Z",
+    "first_name": "John",
+    "last_name": "Doe"
+  }
+}
+```
+
+#### Get Vacation Requests for Employee
+
+Get vacation requests for a specific employee.
+
+- **URL:** `/vacation/requests/:employeeId`
+- **Method:** `GET`
+- **Auth required:** Yes (Admin or Employee's own data)
+- **Query Parameters:**
+  - `limit` (optional): Number of results per page (default: 10)
+  - `page` (optional): Page number (default: 1)
+  - `status` (optional): Filter by status (pending, approved, denied)
+
+**Success Response:**
+```json
+{
+  "success": true,
+  "message": "Vacation requests retrieved successfully",
+  "data": [
+    {
+      "id": 1,
+      "employee_id": "EMP001",
+      "start_date": "2025-08-01",
+      "end_date": "2025-08-03",
+      "total_hours": 24.00,
+      "notes": "Family vacation",
+      "status": "pending",
+      "request_date": "2025-07-10T15:30:00.000Z",
+      "approved_date": null,
+      "first_name": "John",
+      "last_name": "Doe",
+      "approved_by_name": null
+    }
+  ]
+}
+```
+
+#### Get All Vacation Requests (Admin)
+
+Get all vacation requests across all employees.
+
+- **URL:** `/vacation/requests`
+- **Method:** `GET`
+- **Auth required:** Yes (Admin only)
+- **Query Parameters:**
+  - `limit` (optional): Number of results per page (default: 20)
+  - `page` (optional): Page number (default: 1)
+  - `status` (optional): Filter by status (pending, approved, denied)
+
+**Success Response:**
+```json
+{
+  "success": true,
+  "message": "All vacation requests retrieved successfully",
+  "data": [
+    {
+      "id": 1,
+      "employee_id": "EMP001",
+      "start_date": "2025-08-01",
+      "end_date": "2025-08-03",
+      "total_hours": 24.00,
+      "notes": "Family vacation",
+      "status": "pending",
+      "request_date": "2025-07-10T15:30:00.000Z",
+      "approved_date": null,
+      "first_name": "John",
+      "last_name": "Doe",
+      "approved_by_name": null
+    }
+  ]
+}
+```
+
+#### Approve/Deny Vacation Request
+
+Update the status of a vacation request.
+
+- **URL:** `/vacation/requests/:requestId/status`
+- **Method:** `PUT`
+- **Auth required:** Yes (Admin only)
+
+**Request Body:**
+```json
+{
+  "status": "approved"
+}
+```
+
+**Success Response:**
+```json
+{
+  "success": true,
+  "message": "Vacation request status updated successfully",
+  "data": {
+    "id": 1,
+    "employee_id": "EMP001",
+    "start_date": "2025-08-01",
+    "end_date": "2025-08-03",
+    "total_hours": 24.00,
+    "notes": "Family vacation",
+    "status": "approved",
+    "request_date": "2025-07-10T15:30:00.000Z",
+    "approved_date": "2025-07-10T16:00:00.000Z",
+    "first_name": "John",
+    "last_name": "Doe",
+    "approved_by_name": "Admin User"
+  }
+}
+```
+
+#### Get Vacation Request Details
+
+Get details of a specific vacation request.
+
+- **URL:** `/vacation/requests/detail/:requestId`
+- **Method:** `GET`
+- **Auth required:** Yes (Admin or Employee's own request)
+
+**Success Response:**
+```json
+{
+  "success": true,
+  "message": "Vacation request retrieved successfully",
+  "data": {
+    "id": 1,
+    "employee_id": "EMP001",
+    "start_date": "2025-08-01",
+    "end_date": "2025-08-03",
+    "total_hours": 24.00,
+    "notes": "Family vacation",
+    "status": "pending",
+    "request_date": "2025-07-10T15:30:00.000Z",
+    "approved_date": null,
+    "first_name": "John",
+    "last_name": "Doe",
+    "approved_by_name": null
+  }
+}
+```

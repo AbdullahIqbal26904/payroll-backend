@@ -262,6 +262,99 @@ const generatePaystubPDF = async (payrollItem, periodData, options = {}) => {
           });
       }
       
+      // Add YTD Information Section
+      doc.moveDown(2);
+      doc.fontSize(12).font('Helvetica-Bold').text('Year-To-Date Summary');
+      doc.moveDown(0.5);
+      
+      // YTD Table header
+      doc.font('Helvetica-Bold')
+        .text('Description', 50, doc.y, { width: colWidth, align: 'left' })
+        .text('Current Period', 50 + colWidth, doc.y - doc.currentLineHeight(), { width: colWidth, align: 'right' })
+        .text('Year-To-Date', 50 + colWidth * 2, doc.y - doc.currentLineHeight(), { width: colWidth, align: 'right' });
+      
+      // Add horizontal line
+      doc.moveTo(50, doc.y + 5)
+        .lineTo(550, doc.y + 5)
+        .stroke();
+      doc.moveDown(0.5);
+      
+      // YTD data handling (both camelCase and snake_case)
+      const ytdGrossPay = parseFloat(payrollItem.ytdGrossPay || payrollItem.ytd_gross_pay || 0).toFixed(2);
+      const ytdSocialSecurityEmployee = parseFloat(payrollItem.ytdSocialSecurityEmployee || payrollItem.ytd_social_security_employee || 0).toFixed(2);
+      const ytdMedicalBenefitsEmployee = parseFloat(payrollItem.ytdMedicalBenefitsEmployee || payrollItem.ytd_medical_benefits_employee || 0).toFixed(2);
+      const ytdEducationLevy = parseFloat(payrollItem.ytdEducationLevy || payrollItem.ytd_education_levy || 0).toFixed(2);
+      const ytdLoanDeduction = parseFloat(payrollItem.ytdLoanDeduction || payrollItem.ytd_loan_deduction || 0).toFixed(2);
+      const ytdNetPay = parseFloat(payrollItem.ytdNetPay || payrollItem.ytd_net_pay || 0).toFixed(2);
+      const ytdHoursWorked = parseFloat(payrollItem.ytdHoursWorked || payrollItem.ytd_hours_worked || 0).toFixed(2);
+      
+      // Gross Pay YTD
+      doc.font('Helvetica')
+        .text('Gross Pay', 50, doc.y, { width: colWidth, align: 'left' })
+        .text(`$${grossPay}`, 50 + colWidth, doc.y - doc.currentLineHeight(), { width: colWidth, align: 'right' })
+        .text(`$${ytdGrossPay}`, 50 + colWidth * 2, doc.y - doc.currentLineHeight(), { width: colWidth, align: 'right' });
+      
+      // Social Security YTD
+      doc.font('Helvetica')
+        .text('Social Security', 50, doc.y, { width: colWidth, align: 'left' })
+        .text(`$${socialSecurityEmployee}`, 50 + colWidth, doc.y - doc.currentLineHeight(), { width: colWidth, align: 'right' })
+        .text(`$${ytdSocialSecurityEmployee}`, 50 + colWidth * 2, doc.y - doc.currentLineHeight(), { width: colWidth, align: 'right' });
+      
+      // Medical Benefits YTD
+      doc.font('Helvetica')
+        .text('Medical Benefits', 50, doc.y, { width: colWidth, align: 'left' })
+        .text(`$${medicalBenefitsEmployee}`, 50 + colWidth, doc.y - doc.currentLineHeight(), { width: colWidth, align: 'right' })
+        .text(`$${ytdMedicalBenefitsEmployee}`, 50 + colWidth * 2, doc.y - doc.currentLineHeight(), { width: colWidth, align: 'right' });
+      
+      // Education Levy YTD
+      doc.font('Helvetica')
+        .text('Education Levy', 50, doc.y, { width: colWidth, align: 'left' })
+        .text(`$${educationLevy}`, 50 + colWidth, doc.y - doc.currentLineHeight(), { width: colWidth, align: 'right' })
+        .text(`$${ytdEducationLevy}`, 50 + colWidth * 2, doc.y - doc.currentLineHeight(), { width: colWidth, align: 'right' });
+      
+      // Loan Deduction YTD (if applicable)
+      if (parseFloat(loanDeduction) > 0 || parseFloat(ytdLoanDeduction) > 0) {
+        doc.font('Helvetica')
+          .text('Loan Repayment', 50, doc.y, { width: colWidth, align: 'left' })
+          .text(`$${loanDeduction}`, 50 + colWidth, doc.y - doc.currentLineHeight(), { width: colWidth, align: 'right' })
+          .text(`$${ytdLoanDeduction}`, 50 + colWidth * 2, doc.y - doc.currentLineHeight(), { width: colWidth, align: 'right' });
+      }
+      
+      // Hours Worked YTD
+      doc.font('Helvetica')
+        .text('Hours Worked', 50, doc.y, { width: colWidth, align: 'left' })
+        .text(hoursWorked.toString(), 50 + colWidth, doc.y - doc.currentLineHeight(), { width: colWidth, align: 'right' })
+        .text(ytdHoursWorked, 50 + colWidth * 2, doc.y - doc.currentLineHeight(), { width: colWidth, align: 'right' });
+      
+      // Add horizontal line
+      doc.moveDown();
+      doc.moveTo(50, doc.y)
+        .lineTo(550, doc.y)
+        .stroke();
+      doc.moveDown(0.5);
+      
+      // Net Pay YTD (bold)
+      doc.font('Helvetica-Bold')
+        .text('Net Pay', 50, doc.y, { width: colWidth, align: 'left' })
+        .text(`$${netPay}`, 50 + colWidth, doc.y - doc.currentLineHeight(), { width: colWidth, align: 'right' })
+        .text(`$${ytdNetPay}`, 50 + colWidth * 2, doc.y - doc.currentLineHeight(), { width: colWidth, align: 'right' });
+
+      // Add Vacation Entitlement Section
+      if (payrollItem.vacation_balance !== undefined || payrollItem.annual_pto_hours !== undefined) {
+        doc.moveDown(2);
+        doc.fontSize(12).font('Helvetica-Bold').text('Vacation Entitlement');
+        doc.moveDown(0.5);
+        
+        const vacationBalance = parseFloat(payrollItem.vacation_balance || 0).toFixed(2);
+        const annualPtoHours = parseFloat(payrollItem.annual_pto_hours || 0).toFixed(2);
+        const accrualRate = parseFloat(payrollItem.accrual_rate_per_hour || 0).toFixed(6);
+        
+        doc.font('Helvetica')
+          .text(`Annual PTO Allocation: ${annualPtoHours} hours`, 50, doc.y)
+          .text(`Current Vacation Balance: ${vacationBalance} hours`, 50, doc.y)
+          .text(`Accrual Rate: ${accrualRate} hours per hour worked`, 50, doc.y);
+      }
+
       // Add footer
       doc.fontSize(8).font('Helvetica')
         .text('This is an electronic paystub and does not require a signature.', 50, 700);

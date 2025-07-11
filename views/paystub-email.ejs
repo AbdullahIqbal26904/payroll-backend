@@ -28,27 +28,68 @@
       <table>
         <tr>
           <th>Item</th>
-          <th>Amount</th>
+          <th>Current Period</th>
+          <th>Year-To-Date</th>
         </tr>
         <tr>
           <td>Pay Date</td>
-          <td><%= payDate %></td>
+          <td colspan="2"><%= payDate %></td>
         </tr>
         <tr>
           <td>Gross Pay</td>
           <td>$<%= grossPay.toFixed(2) %></td>
+          <td>$<%= (ytdGrossPay || 0).toFixed(2) %></td>
+        </tr>
+        <tr>
+          <td>Social Security</td>
+          <td>$<%= (socialSecurityEmployee || 0).toFixed(2) %></td>
+          <td>$<%= (ytdSocialSecurityEmployee || 0).toFixed(2) %></td>
+        </tr>
+        <tr>
+          <td>Medical Benefits</td>
+          <td>$<%= (medicalBenefitsEmployee || 0).toFixed(2) %></td>
+          <td>$<%= (ytdMedicalBenefitsEmployee || 0).toFixed(2) %></td>
+        </tr>
+        <tr>
+          <td>Education Levy</td>
+          <td>$<%= (educationLevy || 0).toFixed(2) %></td>
+          <td>$<%= (ytdEducationLevy || 0).toFixed(2) %></td>
         </tr>
         <% if (loanDeduction && loanDeduction > 0) { %>
         <tr>
           <td>Loan Repayment</td>
           <td>$<%= loanDeduction.toFixed(2) %></td>
+          <td>$<%= (ytdLoanDeduction || 0).toFixed(2) %></td>
         </tr>
         <% } %>
-        <tr>
-          <td>Net Pay</td>
-          <td>$<%= netPay.toFixed(2) %></td>
+        <tr style="font-weight: bold;">
+          <td><strong>Net Pay</strong></td>
+          <td><strong>$<%= netPay.toFixed(2) %></strong></td>
+          <td><strong>$<%= (ytdNetPay || 0).toFixed(2) %></strong></td>
         </tr>
       </table>
+      
+      <% if (vacationBalance !== undefined) { %>
+      <h3>Vacation Summary</h3>
+      <table>
+        <tr>
+          <th>Item</th>
+          <th>Amount</th>
+        </tr>
+        <tr>
+          <td>Current Vacation Balance</td>
+          <td><%= (vacationBalance || 0).toFixed(2) %> hours</td>
+        </tr>
+        <tr>
+          <td>Annual PTO Allocation</td>
+          <td><%= (annualPtoHours || 0).toFixed(2) %> hours</td>
+        </tr>
+        <tr>
+          <td>Accrual Rate</td>
+          <td><%= (accrualRatePerHour || 0).toFixed(6) %> hrs/hr worked</td>
+        </tr>
+      </table>
+      <% } %>
       
       <p>Your complete paystub with detailed deductions is attached to this email as a PDF document.</p>
       <p>If you have any questions regarding your paystub, please contact the payroll department.</p>
