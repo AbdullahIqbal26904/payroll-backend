@@ -36,7 +36,7 @@ async function up(connection) {
       job_title VARCHAR(100),
       department VARCHAR(100),
       salary_amount DECIMAL(10, 2) DEFAULT 0.00,
-      payment_frequency ENUM('Monthly', 'Bi-Weekly') DEFAULT 'Monthly',
+      payment_frequency ENUM('Monthly', 'Bi-Weekly', 'Semi-Monthly') DEFAULT 'Monthly',
       date_of_birth_for_age INT,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,

@@ -21,7 +21,7 @@ exports.employeeValidation = [
   check('email', 'Please include a valid email').optional().isEmail(),
   check('salary_amount', 'Salary must be a valid number').isNumeric(),
   check('hourly_rate', 'Hourly rate must be a valid number').optional().isNumeric(),
-  check('payment_frequency', 'Payment frequency must be either Monthly or Bi-Weekly').isIn(['Monthly', 'Bi-Weekly']),
+  check('payment_frequency', 'Payment frequency must be Monthly, Bi-Weekly, or Semi-Monthly').isIn(['Monthly', 'Bi-Weekly', 'Semi-Monthly']),
   check('date_of_birth', 'Date of birth must be a valid date').optional().isDate(),
   check('is_exempt_ss', 'Social Security exemption must be a boolean').optional().isBoolean(),
   check('is_exempt_medical', 'Medical benefits exemption must be a boolean').optional().isBoolean()

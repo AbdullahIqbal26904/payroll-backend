@@ -163,6 +163,11 @@ class Payroll {
                   // Assuming 26 pay periods per year (52 weeks / 2)
                   const biWeeklySalary = (parseFloat(employeeData.salary_amount) * 12) / 26;
                   grossPay = biWeeklySalary;
+                } else if (employeeData.payment_frequency === 'Semi-Monthly') {
+                  // For semi-monthly payment (twice a month), divide monthly salary by 2
+                  // Assuming 24 pay periods per year (12 months * 2)
+                  const semiMonthlySalary = parseFloat(employeeData.salary_amount) / 2;
+                  grossPay = semiMonthlySalary;
                 } else {
                   // Monthly pay is the full salary amount
                   grossPay = parseFloat(employeeData.salary_amount);
@@ -442,11 +447,14 @@ class Payroll {
       // Calculate the cap based on the payment frequency
       let socialSecurityCap = settings.social_security_max_insurable;
       
-      // Prorate the cap for bi-weekly payments
+      // Prorate the cap based on payment frequency
       if (paymentFrequency === 'Bi-Weekly') {
         // Approximate period_days/month_days * 6500
         // Assuming a bi-weekly period is ~14 days and a month is ~30 days
         socialSecurityCap = (14 / 30) * settings.social_security_max_insurable;
+      } else if (paymentFrequency === 'Semi-Monthly') {
+        // Semi-Monthly is exactly half of a month
+        socialSecurityCap = 0.5 * settings.social_security_max_insurable;
       }
       
       // Calculate social security based on the capped amount
@@ -472,20 +480,32 @@ class Payroll {
       }
     }
     
-    // 3. Education Levy - Apply only for Monthly payments
+    // 3. Education Levy - Apply for Monthly and Semi-Monthly payments
     // - For salaries below $5,000: (gross - $541.67) * 2.5%
     // - For salaries above $5,000: [(5000 - $541.67) * 2.5%] + [(gross - 5000) * 5%]
-    if (paymentFrequency === 'Monthly') {
-      if (grossPay <= settings.education_levy_threshold) {
+    if (paymentFrequency === 'Monthly' || paymentFrequency === 'Semi-Monthly') {
+      // For Semi-Monthly, we need to adjust the thresholds
+      let threshold = settings.education_levy_threshold;
+      let exemption = settings.education_levy_exemption;
+      
+      // If Semi-Monthly, use half the monthly values
+      if (paymentFrequency === 'Semi-Monthly') {
+        threshold = threshold / 2;
+        exemption = exemption / 2;
+      } else {
+        threshold = settings.education_levy_threshold;
+        exemption = settings.education_levy_exemption;
+      }
+      if (grossPay <= threshold) {
         // Apply the standard rate to amount above exemption
-        const taxable = Math.max(0, grossPay - settings.education_levy_exemption);
+        const taxable = Math.max(0, grossPay - exemption);
         educationLevy = (taxable * settings.education_levy_rate) / 100;
       } else {
-        // For salaries above threshold ($5,000), apply tiered calculation
-        const lowerTierTaxable = settings.education_levy_threshold - settings.education_levy_exemption;
+        // For salaries above threshold ($5,000 or $2,500 for semi-monthly), apply tiered calculation
+        const lowerTierTaxable = threshold - exemption;
         const lowerTierLevy = (lowerTierTaxable * settings.education_levy_rate) / 100;
         
-        const higherTierTaxable = grossPay - settings.education_levy_threshold;
+        const higherTierTaxable = grossPay - threshold;
         const higherTierLevy = (higherTierTaxable * settings.education_levy_high_rate) / 100;
         
         educationLevy = lowerTierLevy + higherTierLevy;
