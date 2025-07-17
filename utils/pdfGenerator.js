@@ -4,9 +4,10 @@ const path = require('path');
 
 /**
  * Generate a paystub PDF
- * @param {Object} payrollItem - Payroll item with employee and payment details
+ * @param {Object} payrollItem - Payroll item with payment details
  * @param {Object} periodData - Pay period information
  * @param {Object} options - PDF generation options
+ * @param {Object} [options.employeeDetails] - Additional employee details from employees table
  * @returns {Buffer} PDF document as buffer
  */
 const generatePaystubPDF = async (payrollItem, periodData, options = {}) => {
@@ -40,10 +41,36 @@ const generatePaystubPDF = async (payrollItem, periodData, options = {}) => {
       // Add employee information
       doc.fontSize(12).font('Helvetica-Bold').text('Employee Information');
       doc.fontSize(10).font('Helvetica');
+      
+      // Get employee details from options or directly from payrollItem
+      const employeeDetails = options.employeeDetails || {};
       const employeeName = payrollItem.employeeName || payrollItem.employee_name || 'Unknown Employee';
       const employeeId = payrollItem.employeeId || payrollItem.employee_id || payrollItem.employee_number;
+      
+      // Get employee type from employee details or payrollItem
+      const employeeType = employeeDetails.employee_type || payrollItem.employeeType || payrollItem.employee_type;
+      
+      // Get salary and hourly rate from employee details first, then payrollItem
+      const hourlyRate = employeeDetails.hourly_rate || payrollItem.hourlyRate || payrollItem.hourly_rate || 0;
+      const salaryAmount = employeeDetails.salary_amount || payrollItem.salaryAmount || payrollItem.salary_amount || 0;
+      const standardHours = employeeDetails.standard_hours || payrollItem.standardHours || payrollItem.standard_hours || 40;
+      
+      // Calculate if salary is prorated based on hours worked compared to standard
+      const regularHours = payrollItem.regularHours || payrollItem.regular_hours || payrollItem.hours_worked || 0;
+      const isProrated = employeeType === 'salary' && parseFloat(regularHours) < (standardHours * 4);
+      
       doc.text(`Name: ${employeeName}`);
       doc.text(`Employee ID: ${employeeId || 'N/A'}`);
+      doc.text(`Employment Type: ${employeeType === 'salary' ? 'Salaried' : 'Hourly'}`);
+      
+      if (employeeType === 'salary') {
+        doc.text(`Monthly Salary: $${parseFloat(salaryAmount || 0).toFixed(2)}`);
+        if (isProrated) {
+          doc.text(`Salary Status: Prorated (worked ${regularHours} of ${standardHours * 4} monthly hours)`);
+        }
+      } else {
+        doc.text(`Hourly Rate: $${parseFloat(hourlyRate || 0).toFixed(2)}`);
+      }
       doc.moveDown();
       
       // Add earnings section
@@ -66,26 +93,62 @@ const generatePaystubPDF = async (payrollItem, periodData, options = {}) => {
         .stroke();
       doc.moveDown(0.5);
       
-      // Regular earnings
+      // We already have employeeType from above, no need to redeclare
       // Handle both camelCase and snake_case property names
       const hoursWorked = payrollItem.hoursWorked || payrollItem.hours_worked || 0;
+      // regularHours is already declared above
+      const overtimeHours = payrollItem.overtimeHours || payrollItem.overtime_hours || 0;
+      const overtimeAmount = parseFloat(payrollItem.overtimeAmount || payrollItem.overtime_amount || 0).toFixed(2);
+      
+      // Calculate regular earnings (gross pay minus overtime)
+      const grossPay = parseFloat(payrollItem.grossPay || payrollItem.gross_pay || 0).toFixed(2);
+      const regularEarnings = (parseFloat(grossPay) - parseFloat(overtimeAmount)).toFixed(2);
       
       // Log data for debugging
       console.log('PDF Generation - Payroll Item:', {
         employeeName: payrollItem.employee_name || payrollItem.employeeName,
         employeeId: payrollItem.employeeId || payrollItem.employee_id || payrollItem.employee_number,
-        grossPay: payrollItem.grossPay || payrollItem.gross_pay,
-        hoursWorked: hoursWorked,
+        employeeType: employeeType,
+        grossPay: grossPay,
+        regularHours: regularHours,
+        overtimeHours: overtimeHours,
+        overtimeAmount: overtimeAmount,
         loanDeduction: payrollItem.loanDeduction || payrollItem.loan_deduction,
         hasLoanDetails: options.loanDetails ? true : false
       });
       
-      const grossPay = parseFloat(payrollItem.grossPay || payrollItem.gross_pay || 0).toFixed(2);
+      // Regular earnings
+      const isHourly = (payrollItem.employeeType || payrollItem.employee_type) !== 'salary';
+      // standardHours is already declared above
+      const calculationDescription = isHourly 
+        ? `Hourly Pay (${parseFloat(payrollItem.hourlyRate || payrollItem.hourly_rate || 0).toFixed(2)}/hour)` 
+        : `Regular Salary${parseFloat(regularHours) < standardHours ? ' (Prorated)' : ''}`;
       
       doc.font('Helvetica')
-        .text('Regular Earnings', 50, doc.y, { width: colWidth, align: 'left' })
-        .text(hoursWorked.toString(), 50 + colWidth, doc.y - doc.currentLineHeight(), { width: colWidth, align: 'right' })
-        .text(`$${grossPay}`, 50 + colWidth * 2, doc.y - doc.currentLineHeight(), { width: colWidth, align: 'right' });
+        .text(calculationDescription, 50, doc.y, { width: colWidth, align: 'left' })
+        .text(regularHours.toString(), 50 + colWidth, doc.y - doc.currentLineHeight(), { width: colWidth, align: 'right' })
+        .text(`$${regularEarnings}`, 50 + colWidth * 2, doc.y - doc.currentLineHeight(), { width: colWidth, align: 'right' });
+      
+      // Add overtime line if applicable (for salaried employees with overtime)
+      if (parseFloat(overtimeHours) > 0 && parseFloat(overtimeAmount) > 0) {
+        doc.moveDown(0.5);
+        doc.font('Helvetica')
+          .text('Overtime (1.5x)', 50, doc.y, { width: colWidth, align: 'left' })
+          .text(overtimeHours.toString(), 50 + colWidth, doc.y - doc.currentLineHeight(), { width: colWidth, align: 'right' })
+          .text(`$${overtimeAmount}`, 50 + colWidth * 2, doc.y - doc.currentLineHeight(), { width: colWidth, align: 'right' });
+          
+        // Add overtime calculation explanation if it's a salaried employee
+        if ((payrollItem.employeeType || payrollItem.employee_type) === 'salary') {
+          const salaryAmount = parseFloat(payrollItem.salaryAmount || payrollItem.salary_amount || 0);
+          const annualSalary = salaryAmount * 12;
+          const hourlyBase = (annualSalary / 52 / 40).toFixed(2);
+          doc.fontSize(8).text(
+            `Overtime calculation: Annual salary $${annualSalary.toFixed(2)} ÷ 52 weeks ÷ 40 hours × 1.5 = $${(hourlyBase * 1.5).toFixed(2)}/hour`, 
+            50, doc.y + 5, { width: tableWidth, align: 'left' }
+          );
+          doc.fontSize(10);
+        }
+      }
       
       // Add horizontal line
       doc.moveDown();
@@ -101,6 +164,41 @@ const generatePaystubPDF = async (payrollItem, periodData, options = {}) => {
         .text(`$${grossPay}`, 50 + colWidth * 2, doc.y - doc.currentLineHeight(), { width: colWidth, align: 'right' });
       
       doc.moveDown(1.5);
+      
+      // Add payment structure details
+      const empType = employeeType; // Already defined above
+      if (empType) {
+        doc.fontSize(10).font('Helvetica-Oblique');
+        doc.text('Payment Structure Details:', 50, doc.y, { width: tableWidth, align: 'left' });
+        
+        if (empType === 'salary') {
+          // standardHours is already defined above
+          const monthlyHours = standardHours * 4;
+          
+          // Use the employeeDetails from options if available, otherwise fall back to payrollItem
+          const empDetails = options.employeeDetails || {};
+          const monthlySalary = parseFloat(empDetails.salary_amount || salaryAmount || 0).toFixed(2);
+          
+          doc.text(`Salaried employee with monthly rate: $${monthlySalary}`, 70, doc.y, { width: tableWidth, align: 'left' });
+          doc.text(`Standard weekly hours: ${standardHours} (${monthlyHours} hours/month)`, 70, doc.y, { width: tableWidth, align: 'left' });
+          
+          if (parseFloat(regularHours) < standardHours * 4 && parseFloat(regularHours) > 0) {
+            const prorationFactor = (parseFloat(regularHours) / (standardHours * 4)).toFixed(4);
+            doc.text(`Salary prorated at ${(prorationFactor * 100).toFixed(2)}% due to working ${regularHours} of ${monthlyHours} monthly hours`, 
+              70, doc.y, { width: tableWidth, align: 'left' });
+          }
+        } else {
+          // Use the employeeDetails from options if available, otherwise fall back to payrollItem
+          const empDetails = options.employeeDetails || {};
+          const hourlyRate = parseFloat(empDetails.hourly_rate || hourlyRate || 0).toFixed(2);
+          
+          doc.text(`Hourly employee with rate: $${hourlyRate}/hour`, 70, doc.y, { width: tableWidth, align: 'left' });
+          doc.text(`Straight pay with no overtime premium`, 70, doc.y, { width: tableWidth, align: 'left' });
+        }
+        
+        doc.fontSize(12).font('Helvetica');
+        doc.moveDown();
+      }
       
       // Add deductions section
       doc.fontSize(12).font('Helvetica-Bold').text('Deductions');

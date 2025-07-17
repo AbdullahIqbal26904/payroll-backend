@@ -148,31 +148,73 @@ class Payroll {
               continue; // Skip this employee since we can't calculate properly
             }
             
-            // Calculate gross pay based on either hourly rate or salary
+            // Calculate gross pay based on employee type (salary vs hourly)
             let grossPay = 0;
+            let regularHours = 0;
+            let overtimeHours = 0;
+            let overtimeAmount = 0;
+            const standardHours = employeeData.standard_hours || 40; // Default to 40 hours if not set
             
             try {
-              if (employeeData.hourly_rate && parseFloat(employeeData.hourly_rate) > 0) {
-                // If hourly rate is set, calculate based on hours worked
+              // Determine employee type (default to hourly if not specified)
+              const employeeType = employeeData.employee_type || 'hourly';
+              console.log(`Processing employee type: ${employeeType} for ${employeeData.first_name} ${employeeData.last_name}`);
+              
+              if (employeeType === 'hourly' && employeeData.hourly_rate && parseFloat(employeeData.hourly_rate) > 0) {
+                // For hourly employees, simply multiply hours worked by hourly rate (no overtime)
                 grossPay = employee.totalHours * parseFloat(employeeData.hourly_rate);
+                regularHours = employee.totalHours;
                 console.log(`Calculated hourly pay: ${employee.totalHours} hours * ${employeeData.hourly_rate} rate = ${grossPay}`);
-              } else if (employeeData.salary_amount && parseFloat(employeeData.salary_amount) > 0) {
-                // If salary is set, use the salary amount based on payment frequency
+              } 
+              else if (employeeType === 'salary' && employeeData.salary_amount && parseFloat(employeeData.salary_amount) > 0) {
+                // For salaried employees
+                let baseSalary = 0;
+                
+                // Calculate base salary based on payment frequency
                 if (employeeData.payment_frequency === 'Bi-Weekly') {
                   // For bi-weekly payment, convert monthly salary to bi-weekly
                   // Assuming 26 pay periods per year (52 weeks / 2)
-                  const biWeeklySalary = (parseFloat(employeeData.salary_amount) * 12) / 26;
-                  grossPay = biWeeklySalary;
+                  baseSalary = (parseFloat(employeeData.salary_amount) * 12) / 26;
                 } else if (employeeData.payment_frequency === 'Semi-Monthly') {
                   // For semi-monthly payment (twice a month), divide monthly salary by 2
                   // Assuming 24 pay periods per year (12 months * 2)
-                  const semiMonthlySalary = parseFloat(employeeData.salary_amount) / 2;
-                  grossPay = semiMonthlySalary;
+                  baseSalary = parseFloat(employeeData.salary_amount) / 2;
                 } else {
                   // Monthly pay is the full salary amount
-                  grossPay = parseFloat(employeeData.salary_amount);
+                  baseSalary = parseFloat(employeeData.salary_amount);
                 }
-                console.log(`Using salary amount: ${employeeData.salary_amount}, payment frequency: ${employeeData.payment_frequency}, calculated: ${grossPay}`);
+                
+                // Calculate hours worked vs standard hours
+                const payPeriodStandardHours = standardHours * (employeeData.payment_frequency === 'Monthly' ? 4 : 2); // 40hrs/week * weeks in pay period
+                
+                if (employee.totalHours >= payPeriodStandardHours) {
+                  // Employee worked standard or more hours
+                  regularHours = payPeriodStandardHours;
+                  
+                  // Calculate overtime for hours over the standard
+                  if (employee.totalHours > payPeriodStandardHours) {
+                    overtimeHours = employee.totalHours - payPeriodStandardHours;
+                    
+                    // Calculate overtime rate: (annual_salary / 52 weeks / standard weekly hours)
+                    const annualSalary = parseFloat(employeeData.salary_amount) * 12;
+                    const hourlyRate = annualSalary / 52 / standardHours;
+                    const overtimeRate = hourlyRate * 1.5; // 1.5x for overtime
+                    
+                    overtimeAmount = overtimeHours * overtimeRate;
+                    console.log(`Calculated overtime: ${overtimeHours} hours at rate ${overtimeRate.toFixed(2)} = ${overtimeAmount.toFixed(2)}`);
+                  }
+                  
+                  // Full salary plus any overtime
+                  grossPay = baseSalary + overtimeAmount;
+                } else {
+                  // Employee worked less than standard hours - prorate the salary
+                  const prorationFactor = employee.totalHours / payPeriodStandardHours;
+                  regularHours = employee.totalHours;
+                  grossPay = baseSalary * prorationFactor;
+                  console.log(`Prorated salary: ${baseSalary} * ${prorationFactor} = ${grossPay}`);
+                }
+                
+                console.log(`Calculated salary pay: Base ${baseSalary}, Overtime ${overtimeAmount}, Total ${grossPay}`);
               }
               
               // Ensure grossPay is a valid number
@@ -241,13 +283,17 @@ class Payroll {
               ytdTotals.ytd_hours_worked += employee.totalHours;
             }
             
-            // Save the payroll item with YTD totals
+            // Save the payroll item with YTD totals and regular/overtime breakdowns
             const [payrollItem] = await connection.query(
               `INSERT INTO payroll_items (
                 payroll_run_id,
                 employee_id,
                 employee_name,
+                employee_type,
                 hours_worked,
+                regular_hours,
+                overtime_hours,
+                overtime_amount,
                 gross_pay,
                 social_security_employee,
                 social_security_employer,
@@ -266,12 +312,16 @@ class Payroll {
                 ytd_loan_deduction,
                 ytd_net_pay,
                 ytd_hours_worked
-              ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+              ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
               [
                 payrollRunId,
                 employeeData.id,
                 `${employeeData.first_name} ${employeeData.last_name}`,
+                employeeData.employee_type || 'hourly', // Store the employee type
                 employee.totalHours,
+                regularHours || employee.totalHours, // Store regular hours
+                overtimeHours || 0, // Store overtime hours
+                overtimeAmount || 0, // Store overtime amount
                 grossPay,
                 deductions.socialSecurityEmployee,
                 deductions.socialSecurityEmployer,

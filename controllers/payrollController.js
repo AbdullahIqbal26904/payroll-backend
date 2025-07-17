@@ -440,8 +440,29 @@ exports.downloadPaystub = async (req, res) => {
       payDate: payrollRun.pay_date ? new Date(payrollRun.pay_date).toLocaleDateString() : new Date().toLocaleDateString()
     };
     
-    // Generate PDF
-    const pdfBuffer = await generatePaystubPDF(payrollItem, periodData, { loanDetails });
+    // Fetch employee details from database
+    let employeeDetails = null;
+    if (payrollItem.employee_id) {
+      try {
+        const [rows] = await db.query(
+          'SELECT * FROM employees WHERE id = ?',
+          [payrollItem.employee_id]
+        );
+        
+        if (rows && rows.length > 0) {
+          employeeDetails = rows[0];
+          console.log(`Found employee details for ID ${payrollItem.employee_id}:`, employeeDetails);
+        }
+      } catch (err) {
+        console.error('Error fetching employee details:', err);
+      }
+    }
+    
+    // Generate PDF with employee details
+    const pdfBuffer = await generatePaystubPDF(payrollItem, periodData, { 
+      loanDetails,
+      employeeDetails 
+    });
     
     // Set headers for PDF download
     res.setHeader('Content-Type', 'application/pdf');
