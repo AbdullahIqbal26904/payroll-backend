@@ -1,6 +1,5 @@
 const db = require('../config/db');
 const EmployeeLoan = require('./EmployeeLoan');
-const VacationEntitlement = require('./VacationEntitlement');
 
 /**
  * @class Payroll
@@ -393,20 +392,17 @@ class Payroll {
               );
             }
             
-            // Update vacation accrual if employee exists in database
+            // Update YTD summary if employee exists in database
             if (employeeData.id) {
               try {
                 const payDate = new Date(options.payDate || new Date());
                 const year = payDate.getFullYear();
                 
-                // Update vacation accrual based on hours worked
-                await VacationEntitlement.updateAccrual(employeeData.id, employee.totalHours, year);
-                
                 // Update YTD summary table for efficient reporting
                 await this.updateYTDSummary(employeeData.id, ytdTotals, year);
-              } catch (vacationError) {
-                console.error(`Error updating vacation accrual for employee ${employeeData.id}:`, vacationError);
-                // Don't fail the entire payroll process for vacation accrual errors
+              } catch (ytdError) {
+                console.error(`Error updating YTD summary for employee ${employeeData.id}:`, ytdError);
+                // Don't fail the entire payroll process for YTD update errors
               }
             }
             
@@ -663,13 +659,9 @@ class Payroll {
       // Get payroll items with YTD data
       const [items] = await db.query(
         `SELECT pi.*, 
-          e.first_name, e.last_name, e.hire_date,
-          ve.current_balance as vacation_balance,
-          ve.annual_pto_hours,
-          ve.accrual_rate_per_hour
+          e.first_name, e.last_name, e.hire_date
         FROM payroll_items pi
         LEFT JOIN employees e ON pi.employee_id = e.id
-        LEFT JOIN employee_vacation_entitlements ve ON (e.id = ve.employee_id AND ve.year = YEAR(NOW()))
         WHERE payroll_run_id = ?`,
         [id]
       );
