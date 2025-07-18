@@ -61,13 +61,23 @@ const generatePaystubPDF = async (payrollItem, periodData, options = {}) => {
       
       doc.text(`Name: ${employeeName}`);
       doc.text(`Employee ID: ${employeeId || 'N/A'}`);
-      doc.text(`Employment Type: ${employeeType === 'salary' ? 'Salaried' : 'Hourly'}`);
+      
+      // Show correct employment type
+      if (employeeType === 'salary') {
+        doc.text(`Employment Type: Salaried`);
+      } else if (employeeType === 'private_duty_nurse') {
+        doc.text(`Employment Type: Private Duty Nurse`);
+      } else {
+        doc.text(`Employment Type: Hourly`);
+      }
       
       if (employeeType === 'salary') {
         doc.text(`Monthly Salary: $${parseFloat(salaryAmount || 0).toFixed(2)}`);
         if (isProrated) {
           doc.text(`Salary Status: Prorated (worked ${regularHours} of ${standardHours * 4} monthly hours)`);
         }
+      } else if (employeeType === 'private_duty_nurse') {
+        doc.text(`Hourly Rate: Variable (shift-based)`);
       } else {
         doc.text(`Hourly Rate: $${parseFloat(hourlyRate || 0).toFixed(2)}`);
       }
@@ -118,11 +128,19 @@ const generatePaystubPDF = async (payrollItem, periodData, options = {}) => {
       });
       
       // Regular earnings
-      const isHourly = (payrollItem.employeeType || payrollItem.employee_type) !== 'salary';
+      const employeeTypeForCalc = payrollItem.employeeType || payrollItem.employee_type || employeeType;
+      const isHourly = employeeTypeForCalc !== 'salary';
+      const isNurse = employeeTypeForCalc === 'private_duty_nurse';
       // standardHours is already declared above
-      const calculationDescription = isHourly 
-        ? `Hourly Pay (${parseFloat(payrollItem.hourlyRate || payrollItem.hourly_rate || 0).toFixed(2)}/hour)` 
-        : `Regular Salary${parseFloat(regularHours) < standardHours ? ' (Prorated)' : ''}`;
+      let calculationDescription;
+      
+      if (isNurse) {
+        calculationDescription = `Private Duty Nurse Pay (Variable Shift Rates)`;
+      } else if (isHourly) {
+        calculationDescription = `Hourly Pay (${parseFloat(payrollItem.hourlyRate || payrollItem.hourly_rate || 0).toFixed(2)}/hour)`;
+      } else {
+        calculationDescription = `Regular Salary${parseFloat(regularHours) < standardHours ? ' (Prorated)' : ''}`;
+      }
       
       doc.font('Helvetica')
         .text(calculationDescription, 50, doc.y, { width: colWidth, align: 'left' })
@@ -187,6 +205,12 @@ const generatePaystubPDF = async (payrollItem, periodData, options = {}) => {
             doc.text(`Salary prorated at ${(prorationFactor * 100).toFixed(2)}% due to working ${regularHours} of ${monthlyHours} monthly hours`, 
               70, doc.y, { width: tableWidth, align: 'left' });
           }
+        } else if (empType === 'private_duty_nurse') {
+          doc.text(`Private Duty Nurse with variable shift-based rates:`, 70, doc.y, { width: tableWidth, align: 'left' });
+          doc.text(`• Day Shift (7:00am - 7:00pm) - Monday to Friday: $35.00/hour`, 70, doc.y, { width: tableWidth, align: 'left' });
+          doc.text(`• Night Shift (7:00pm - 7:00am) - All days: $40.00/hour`, 70, doc.y, { width: tableWidth, align: 'left' });
+          doc.text(`• Day Shift (7:00am - 7:00pm) - Saturday and Sunday: $40.00/hour`, 70, doc.y, { width: tableWidth, align: 'left' });
+          doc.text(`No overtime premium applied`, 70, doc.y, { width: tableWidth, align: 'left' });
         } else {
           // Use the employeeDetails from options if available, otherwise fall back to payrollItem
           const empDetails = options.employeeDetails || {};

@@ -17,6 +17,15 @@ Phase 2 has been implemented with the following features:
   - Automatic deduction from paychecks
   - Detailed breakdown of loan information in paystubs
 
+## Latest Updates
+
+- Added support for Private Duty Nurse employee type:
+  - Shift-based pay rates
+  - Day shift (7am-7pm) Monday-Friday: $35/hour
+  - Night shift (7pm-7am) all days: $40/hour
+  - Day shift (7am-7pm) Saturday-Sunday: $40/hour
+  - No overtime eligibility
+
 ## Setup
 
 1. Clone the repository

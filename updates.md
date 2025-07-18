@@ -24,14 +24,20 @@ The current MSA Payroll System successfully implements the core Antigua payroll 
 
 ### 1. Employee Types and Compensation Rules
 
-**Current Status**: The system handles basic salary and hourly calculations but lacks the specific employee type distinctions requested.
+**Current Status**: The system now handles multiple employee types including:
+- Salary (flat rate/admin) - with overtime calculation support
+- Hourly - standard hourly employees
+- Private Duty Nurse - shift-based rates without overtime eligibility:
+  - Day shift (7am-7pm) Monday-Friday: $35/hour
+  - Night shift (7pm-7am) all days: $40/hour
+  - Day shift (7am-7pm) Saturday-Sunday: $40/hour
 
 **Required Changes**:
-- Create distinct employee types (flat rate/admin vs. hourly/nursing)
-- Implement overtime calculations for flat rate employees using the formula: `{(2500 x12) / (52 /40)}`
+- ✅ Create distinct employee types (flat rate/admin vs. hourly/nursing vs. private duty nurse)
+- ✅ Implement overtime calculations for flat rate employees using the formula: `{(2500 x12) / (52 /40)}`
 - Add sick day tracking (12 uncertified days annually)
 - Implement handling for under-threshold work with options for vacation time, bereavement, or unpaid leave
-- Configure hourly employees (nursing) without overtime eligibility
+- ✅ Configure hourly employees (nursing) without overtime eligibility
 
 ### 2. Payment Frequency Options
 

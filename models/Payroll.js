@@ -160,7 +160,47 @@ class Payroll {
               const employeeType = employeeData.employee_type || 'hourly';
               console.log(`Processing employee type: ${employeeType} for ${employeeData.first_name} ${employeeData.last_name}`);
               
-              if (employeeType === 'hourly' && employeeData.hourly_rate && parseFloat(employeeData.hourly_rate) > 0) {
+              if (employeeType === 'private_duty_nurse') {
+                // For private duty nurses, calculate pay based on shifts
+                // Rate is determined by time of day and day of week
+                // Day shift (7am-7pm) Monday-Friday: $35/hour
+                // Night shift (7pm-7am) all days: $40/hour
+                // Day shift (7am-7pm) Saturday-Sunday: $40/hour
+                
+                // Calculate pay for each timesheet entry based on shift
+                grossPay = 0;
+                regularHours = 0;
+                
+                // Process each entry and calculate pay based on shift
+                for (const entry of employee.entries) {
+                  const entryHours = this.parseTimeToHours(entry.total_hours);
+                  const workDate = new Date(entry.work_date);
+                  const dayOfWeek = workDate.getDay(); // 0 = Sunday, 6 = Saturday
+                  const isWeekend = dayOfWeek === 0 || dayOfWeek === 6; // Sunday or Saturday
+                  
+                  // Parse time_in to determine shift (day or night)
+                  const timeIn = entry.time_in;
+                  const hourIn = parseInt(timeIn.split(':')[0], 10);
+                  
+                  let hourlyRate = 35; // Default day shift rate
+                  
+                  // Night shift: 7pm to 7am (19:00 to 07:00) - all days $40/hour
+                  if (hourIn >= 19 || hourIn < 7) {
+                    hourlyRate = 40;
+                  }
+                  // Weekend day shift: 7am to 7pm (07:00 to 19:00) - Saturday/Sunday $40/hour
+                  else if (isWeekend) {
+                    hourlyRate = 40;
+                  }
+                  
+                  const entryPay = entryHours * hourlyRate;
+                  grossPay += entryPay;
+                  regularHours += entryHours;
+                  
+                  console.log(`Private duty nurse pay for ${entry.work_date}: ${entryHours} hours at $${hourlyRate}/hr = $${entryPay}`);
+                }
+              }
+              else if (employeeType === 'hourly' && employeeData.hourly_rate && parseFloat(employeeData.hourly_rate) > 0) {
                 // For hourly employees, simply multiply hours worked by hourly rate (no overtime)
                 grossPay = employee.totalHours * parseFloat(employeeData.hourly_rate);
                 regularHours = employee.totalHours;

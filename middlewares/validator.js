@@ -19,6 +19,7 @@ exports.employeeValidation = [
   check('first_name', 'First name is required').not().isEmpty(),
   check('last_name', 'Last name is required').not().isEmpty(),
   check('email', 'Please include a valid email').optional().isEmail(),
+  check('employee_type', 'Employee type must be salary, hourly, or private_duty_nurse').isIn(['salary', 'hourly', 'private_duty_nurse']),
   check('salary_amount', 'Salary must be a valid number').isNumeric(),
   check('hourly_rate', 'Hourly rate must be a valid number').optional().isNumeric(),
   check('payment_frequency', 'Payment frequency must be Monthly, Bi-Weekly, or Semi-Monthly').isIn(['Monthly', 'Bi-Weekly', 'Semi-Monthly']),
