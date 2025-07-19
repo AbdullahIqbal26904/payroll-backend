@@ -7,7 +7,7 @@ const path = require('path');
  * @param {Object} payrollItem - Payroll item with payment details
  * @param {Object} periodData - Pay period information
  * @param {Object} options - PDF generation options
- * @param {Object} [options.employeeDetails] - Additional employee details from employees table
+ * @param {Object} [options      // Loan functionality removedeeDetails] - Additional employee details from employees table
  * @returns {Buffer} PDF document as buffer
  */
 const generatePaystubPDF = async (payrollItem, periodData, options = {}) => {
@@ -122,9 +122,7 @@ const generatePaystubPDF = async (payrollItem, periodData, options = {}) => {
         grossPay: grossPay,
         regularHours: regularHours,
         overtimeHours: overtimeHours,
-        overtimeAmount: overtimeAmount,
-        loanDeduction: payrollItem.loanDeduction || payrollItem.loan_deduction,
-        hasLoanDetails: options.loanDetails ? true : false
+        overtimeAmount: overtimeAmount
       });
       
       // Regular earnings
@@ -243,7 +241,7 @@ const generatePaystubPDF = async (payrollItem, periodData, options = {}) => {
       const socialSecurityEmployee = parseFloat(payrollItem.socialSecurityEmployee || payrollItem.social_security_employee || 0).toFixed(2);
       const medicalBenefitsEmployee = parseFloat(payrollItem.medicalBenefitsEmployee || payrollItem.medical_benefits_employee || 0).toFixed(2);
       const educationLevy = parseFloat(payrollItem.educationLevy || payrollItem.education_levy || 0).toFixed(2);
-      const loanDeduction = parseFloat(payrollItem.loanDeduction || payrollItem.loan_deduction || 0).toFixed(2);
+      // Loan functionality removed
       
       // Social Security
       doc.font('Helvetica')
@@ -260,12 +258,7 @@ const generatePaystubPDF = async (payrollItem, periodData, options = {}) => {
         .text('Education Levy', 50, doc.y, { width: colWidth * 2, align: 'left' })
         .text(`$${educationLevy}`, 50 + colWidth * 2, doc.y - doc.currentLineHeight(), { width: colWidth, align: 'right' });
       
-      // Employee Loan Deduction
-      if (parseFloat(loanDeduction) > 0) {
-        doc.font('Helvetica')
-          .text('Employee Loan Repayment', 50, doc.y, { width: colWidth * 2, align: 'left' })
-          .text(`$${loanDeduction}`, 50 + colWidth * 2, doc.y - doc.currentLineHeight(), { width: colWidth, align: 'right' });
-      }
+      // Loan functionality removed
       
       // Add horizontal line
       doc.moveDown();
@@ -276,7 +269,7 @@ const generatePaystubPDF = async (payrollItem, periodData, options = {}) => {
       
       // Total deductions
       const totalDeductions = parseFloat(socialSecurityEmployee) + parseFloat(medicalBenefitsEmployee) + 
-        parseFloat(educationLevy) + parseFloat(loanDeduction);
+        parseFloat(educationLevy);
       doc.font('Helvetica-Bold')
         .text('Total Deductions', 50, doc.y, { width: colWidth * 2, align: 'left' })
         .text(`$${totalDeductions.toFixed(2)}`, 50 + colWidth * 2, doc.y - doc.currentLineHeight(), { width: colWidth, align: 'right' });
@@ -332,57 +325,7 @@ const generatePaystubPDF = async (payrollItem, periodData, options = {}) => {
         .text('Total Employer Contributions', 50, doc.y, { width: colWidth * 2, align: 'left' })
         .text(`$${totalEmployerContributions.toFixed(2)}`, 50 + colWidth * 2, doc.y - doc.currentLineHeight(), { width: colWidth, align: 'right' });
       
-      // Add Employee Loan Breakdown if applicable
-      if (parseFloat(loanDeduction) > 0) {
-        doc.moveDown(1.5);
-        doc.fontSize(12).font('Helvetica-Bold').text('Employee Loan Breakdown');
-        doc.moveDown(0.5);
-        
-        // First check if we have detailed loan information
-        if (options.loanDetails) {
-          // Ensure all values are properly handled to avoid null reference errors
-          const loan = options.loanDetails;
-          
-          console.log(`Rendering loan details: ${JSON.stringify(loan)}`);
-          
-          doc.font('Helvetica').fontSize(10);
-          
-          // Safely parse and format loan values
-          const loanAmount = loan.loan_amount ? parseFloat(loan.loan_amount).toFixed(2) : '0.00';
-          const interestRate = loan.interest_rate ? parseFloat(loan.interest_rate).toFixed(2) : '0.00';
-          const totalAmount = loan.total_amount ? parseFloat(loan.total_amount).toFixed(2) : '0.00';
-          const remainingAmount = loan.remaining_amount ? parseFloat(loan.remaining_amount).toFixed(2) : '0.00';
-          const installmentAmount = loan.installment_amount ? parseFloat(loan.installment_amount).toFixed(2) : '0.00';
-          
-          doc.text(`Original Loan Amount: $${loanAmount}`, 50, doc.y);
-          doc.text(`Interest Rate: ${interestRate}%`, 50, doc.y);
-          doc.text(`Total Amount with Interest: $${totalAmount}`, 50, doc.y);
-          doc.text(`Remaining Balance: $${remainingAmount}`, 50, doc.y);
-          doc.text(`Payment Amount: $${installmentAmount} per pay period`, 50, doc.y);
-          
-          if (loan.start_date) {
-            const startDate = new Date(loan.start_date);
-            doc.text(`Loan Start Date: ${startDate.toLocaleDateString()}`, 50, doc.y);
-          }
-          
-          if (loan.expected_end_date) {
-            const endDate = new Date(loan.expected_end_date);
-            doc.text(`Expected End Date: ${endDate.toLocaleDateString()}`, 50, doc.y);
-          }
-        } else {
-          // If we don't have detailed loan information, just show the current deduction
-          doc.font('Helvetica').fontSize(10);
-          doc.text(`Current Loan Deduction: $${loanDeduction}`, 50, doc.y);
-          doc.text(`No detailed loan information available.`, 50, doc.y);
-        }
-        
-        doc.moveDown();
-        doc.fontSize(9).font('Helvetica-Oblique')
-          .text('Note: An employee loan or payroll deduction loan is money lent by employers to someone who works for them. It\'s like a personal loan, except the interest rates are usually less than what a bank might offer.', {
-            width: 500,
-            align: 'left'
-          });
-      }
+      
       
       // Add YTD Information Section
       doc.moveDown(2);
@@ -406,7 +349,7 @@ const generatePaystubPDF = async (payrollItem, periodData, options = {}) => {
       const ytdSocialSecurityEmployee = parseFloat(payrollItem.ytdSocialSecurityEmployee || payrollItem.ytd_social_security_employee || 0).toFixed(2);
       const ytdMedicalBenefitsEmployee = parseFloat(payrollItem.ytdMedicalBenefitsEmployee || payrollItem.ytd_medical_benefits_employee || 0).toFixed(2);
       const ytdEducationLevy = parseFloat(payrollItem.ytdEducationLevy || payrollItem.ytd_education_levy || 0).toFixed(2);
-      const ytdLoanDeduction = parseFloat(payrollItem.ytdLoanDeduction || payrollItem.ytd_loan_deduction || 0).toFixed(2);
+      // Loan functionality removed
       const ytdNetPay = parseFloat(payrollItem.ytdNetPay || payrollItem.ytd_net_pay || 0).toFixed(2);
       const ytdHoursWorked = parseFloat(payrollItem.ytdHoursWorked || payrollItem.ytd_hours_worked || 0).toFixed(2);
       
@@ -434,13 +377,7 @@ const generatePaystubPDF = async (payrollItem, periodData, options = {}) => {
         .text(`$${educationLevy}`, 50 + colWidth, doc.y - doc.currentLineHeight(), { width: colWidth, align: 'right' })
         .text(`$${ytdEducationLevy}`, 50 + colWidth * 2, doc.y - doc.currentLineHeight(), { width: colWidth, align: 'right' });
       
-      // Loan Deduction YTD (if applicable)
-      if (parseFloat(loanDeduction) > 0 || parseFloat(ytdLoanDeduction) > 0) {
-        doc.font('Helvetica')
-          .text('Loan Repayment', 50, doc.y, { width: colWidth, align: 'left' })
-          .text(`$${loanDeduction}`, 50 + colWidth, doc.y - doc.currentLineHeight(), { width: colWidth, align: 'right' })
-          .text(`$${ytdLoanDeduction}`, 50 + colWidth * 2, doc.y - doc.currentLineHeight(), { width: colWidth, align: 'right' });
-      }
+      // Loan functionality removed
       
       // Hours Worked YTD
       doc.font('Helvetica')

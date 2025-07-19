@@ -1,5 +1,4 @@
 const db = require('../config/db');
-const EmployeeLoan = require('./EmployeeLoan');
 
 /**
  * @class Payroll
@@ -275,22 +274,8 @@ class Payroll {
               ? this.calculateAge(new Date(employeeData.date_of_birth)) 
               : 30; // Default age if unknown
             
-            // Check if employee has any active loans
-            let loanData = null;
-            if (employeeData.id) {
-              const activeLoans = await EmployeeLoan.getActiveLoansForEmployee(employeeData.id);
-              if (activeLoans.length > 0) {
-                // Use the first active loan (or we could sum multiple loans if needed)
-                const activeLoan = activeLoans[0];
-                loanData = {
-                  id: activeLoan.id,
-                  amount: Math.min(activeLoan.installment_amount, activeLoan.remaining_amount) // Don't deduct more than remaining
-                };
-              }
-            }
-            
             // Calculate deductions based on Antigua rules
-            const deductions = this.calculateDeductions(grossPay, age, payrollSettings, employeeData.payment_frequency, employeeData, loanData);
+            const deductions = this.calculateDeductions(grossPay, age, payrollSettings, employeeData.payment_frequency, employeeData);
             
             // Calculate YTD totals up to this pay date
             let ytdTotals = {
@@ -300,7 +285,6 @@ class Payroll {
               ytd_medical_benefits_employee: 0,
               ytd_medical_benefits_employer: 0,
               ytd_education_levy: 0,
-              ytd_loan_deduction: 0,
               ytd_net_pay: 0,
               ytd_hours_worked: 0
             };
@@ -317,7 +301,6 @@ class Payroll {
               ytdTotals.ytd_medical_benefits_employee += deductions.medicalBenefitsEmployee;
               ytdTotals.ytd_medical_benefits_employer += deductions.medicalBenefitsEmployer;
               ytdTotals.ytd_education_levy += deductions.educationLevy;
-              ytdTotals.ytd_loan_deduction += (deductions.loanDeduction || 0);
               ytdTotals.ytd_net_pay += deductions.netPay;
               ytdTotals.ytd_hours_worked += employee.totalHours;
             }
@@ -339,7 +322,6 @@ class Payroll {
                 medical_benefits_employee,
                 medical_benefits_employer,
                 education_levy,
-                loan_deduction,
                 total_employer_contributions,
                 net_pay,
                 ytd_gross_pay,
@@ -348,10 +330,9 @@ class Payroll {
                 ytd_medical_benefits_employee,
                 ytd_medical_benefits_employer,
                 ytd_education_levy,
-                ytd_loan_deduction,
                 ytd_net_pay,
                 ytd_hours_worked
-              ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+              ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
               [
                 payrollRunId,
                 employeeData.id,
@@ -367,7 +348,6 @@ class Payroll {
                 deductions.medicalBenefitsEmployee,
                 deductions.medicalBenefitsEmployer,
                 deductions.educationLevy,
-                deductions.loanDeduction || 0,
                 deductions.totalEmployerContributions,
                 deductions.netPay,
                 ytdTotals.ytd_gross_pay,
@@ -376,21 +356,11 @@ class Payroll {
                 ytdTotals.ytd_medical_benefits_employee,
                 ytdTotals.ytd_medical_benefits_employer,
                 ytdTotals.ytd_education_levy,
-                ytdTotals.ytd_loan_deduction,
                 ytdTotals.ytd_net_pay,
                 ytdTotals.ytd_hours_worked
               ]
             );
-            
-            // If there's a loan, process the loan payment
-            if (loanData && loanData.id && deductions.loanDeduction > 0) {
-              await EmployeeLoan.processPayment(
-                loanData.id, 
-                payrollItem.insertId, 
-                deductions.loanDeduction,
-                options.payDate || new Date()
-              );
-            }
+            // Loan functionality removed
             
             // Update YTD summary if employee exists in database
             if (employeeData.id) {
@@ -513,17 +483,15 @@ class Payroll {
    * @param {Object} settings - Payroll settings
    * @param {string} paymentFrequency - Payment frequency (Bi-Weekly or Monthly)
    * @param {Object} employeeData - Employee data for exemption checks
-   * @param {Object} loanData - Optional loan data for this employee
    * @returns {Object} Calculated deductions
    */
-  static calculateDeductions(grossPay, age, settings, paymentFrequency = 'Bi-Weekly', employeeData = null, loanData = null) {
+  static calculateDeductions(grossPay, age, settings, paymentFrequency = 'Bi-Weekly', employeeData = null) {
     // Initialize deduction amounts
     let socialSecurityEmployee = 0;
     let socialSecurityEmployer = 0;
     let medicalBenefitsEmployee = 0;
     let medicalBenefitsEmployer = 0;
     let educationLevy = 0;
-    let loanDeduction = 0;
     
     // 1. Social Security - 16% of gross salary (7% employee, 9% employer)
     // - Maximum monthly insurable earning is $6,500
@@ -601,13 +569,8 @@ class Payroll {
       educationLevy = Math.max(0, educationLevy);
     }
     
-    // 4. Loan Deduction - If the employee has an active loan
-    if (loanData && loanData.amount > 0) {
-      loanDeduction = loanData.amount;
-    }
-    
     // Calculate net pay (gross pay minus all employee deductions)
-    const totalEmployeeDeductions = socialSecurityEmployee + medicalBenefitsEmployee + educationLevy + loanDeduction;
+    const totalEmployeeDeductions = socialSecurityEmployee + medicalBenefitsEmployee + educationLevy;
     const totalEmployerContributions = socialSecurityEmployer + medicalBenefitsEmployer;
     const netPay = grossPay - totalEmployeeDeductions;
     
@@ -617,7 +580,6 @@ class Payroll {
       medicalBenefitsEmployee,
       medicalBenefitsEmployer,
       educationLevy,
-      loanDeduction,
       totalDeductions: totalEmployeeDeductions,
       totalEmployerContributions,
       netPay
@@ -730,7 +692,6 @@ class Payroll {
           SUM(medical_benefits_employee) as ytd_medical_benefits_employee,
           SUM(medical_benefits_employer) as ytd_medical_benefits_employer,
           SUM(education_levy) as ytd_education_levy,
-          SUM(loan_deduction) as ytd_loan_deduction,
           SUM(net_pay) as ytd_net_pay,
           SUM(hours_worked) as ytd_hours_worked
         FROM payroll_items pi
@@ -752,7 +713,6 @@ class Payroll {
         ytd_medical_benefits_employee: parseFloat(result.ytd_medical_benefits_employee || 0),
         ytd_medical_benefits_employer: parseFloat(result.ytd_medical_benefits_employer || 0),
         ytd_education_levy: parseFloat(result.ytd_education_levy || 0),
-        ytd_loan_deduction: parseFloat(result.ytd_loan_deduction || 0),
         ytd_net_pay: parseFloat(result.ytd_net_pay || 0),
         ytd_hours_worked: parseFloat(result.ytd_hours_worked || 0)
       };
@@ -774,9 +734,9 @@ class Payroll {
         `INSERT INTO employee_ytd_summary 
         (employee_id, year, ytd_gross_pay, ytd_social_security_employee, 
          ytd_social_security_employer, ytd_medical_benefits_employee, 
-         ytd_medical_benefits_employer, ytd_education_levy, ytd_loan_deduction, 
+         ytd_medical_benefits_employer, ytd_education_levy, 
          ytd_net_pay, ytd_hours_worked) 
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON DUPLICATE KEY UPDATE 
         ytd_gross_pay = VALUES(ytd_gross_pay),
         ytd_social_security_employee = VALUES(ytd_social_security_employee),
@@ -784,7 +744,6 @@ class Payroll {
         ytd_medical_benefits_employee = VALUES(ytd_medical_benefits_employee),
         ytd_medical_benefits_employer = VALUES(ytd_medical_benefits_employer),
         ytd_education_levy = VALUES(ytd_education_levy),
-        ytd_loan_deduction = VALUES(ytd_loan_deduction),
         ytd_net_pay = VALUES(ytd_net_pay),
         ytd_hours_worked = VALUES(ytd_hours_worked)`,
         [
@@ -795,7 +754,6 @@ class Payroll {
           ytdData.ytd_medical_benefits_employee,
           ytdData.ytd_medical_benefits_employer,
           ytdData.ytd_education_levy,
-          ytdData.ytd_loan_deduction,
           ytdData.ytd_net_pay,
           ytdData.ytd_hours_worked
         ]
