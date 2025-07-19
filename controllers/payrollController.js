@@ -430,9 +430,36 @@ exports.downloadPaystub = async (req, res) => {
       }
     }
     
-    // Generate PDF with employee details
+    // Get loan details if there's a loan deduction
+    let loanDetails = [];
+    if (payrollItem.loan_deduction && parseFloat(payrollItem.loan_deduction) > 0) {
+      // Get loan payment details for this payroll item
+      const [loanPayments] = await db.query(`
+        SELECT 
+          lp.*, 
+          el.expected_end_date
+        FROM 
+          loan_payments lp
+        JOIN 
+          employee_loans el ON lp.loan_id = el.id
+        WHERE 
+          lp.payroll_item_id = ?
+      `, [payrollItem.id]);
+      
+      if (loanPayments && loanPayments.length > 0) {
+        loanDetails = loanPayments.map(payment => ({
+          loanId: payment.loan_id,
+          paymentAmount: payment.payment_amount,
+          remainingBalance: payment.remaining_balance,
+          expectedEndDate: payment.expected_end_date ? new Date(payment.expected_end_date).toLocaleDateString() : null
+        }));
+      }
+    }
+    
+    // Generate PDF with employee details and loan information
     const pdfBuffer = await generatePaystubPDF(payrollItem, periodData, { 
-      employeeDetails 
+      employeeDetails,
+      loanDetails
     });
     
     // Set headers for PDF download

@@ -2,277 +2,373 @@ const db = require('../config/db');
 
 /**
  * @class EmployeeLoan
- * @description Employee loan model for managing loan data and calculations
+ * @description Model for employee loan management
  */
 class EmployeeLoan {
   /**
-   * Get all loans with optional filtering
-   * @param {Object} options - Filter and pagination options
-   * @returns {Promise<Array>} Array of loan records
+   * Get all employee loans with pagination and filtering
+   * @param {Object} options - Query options for pagination and filtering
+   * @returns {Promise<Object>} Employee loans with pagination info
    */
   static async getAllLoans(options = {}) {
     try {
-      const page = options.page || 1;
-      const limit = options.limit || 10;
-      const offset = (page - 1) * limit;
-      
+      const { 
+        limit = 10, 
+        offset = 0, 
+        sortBy = 'created_at', 
+        sortOrder = 'DESC',
+        employeeId,
+        status
+      } = options;
+
       let query = `
-        SELECT l.*, e.first_name, e.last_name
-        FROM employee_loans l
-        JOIN employees e ON l.employee_id = e.id
+        SELECT el.*, 
+          CONCAT(e.first_name, ' ', e.last_name) as employee_name
+        FROM employee_loans el
+        JOIN employees e ON el.employee_id = e.id
+        WHERE 1=1
       `;
-      
-      // Add filters if provided
-      const whereConditions = [];
-      const queryParams = [];
-      
-      if (options.employeeId) {
-        whereConditions.push('l.employee_id = ?');
-        queryParams.push(options.employeeId);
+      let queryParams = [];
+
+      // Apply filters
+      if (employeeId) {
+        query += ` AND el.employee_id = ?`;
+        queryParams.push(employeeId);
       }
-      
-      if (options.status) {
-        whereConditions.push('l.status = ?');
-        queryParams.push(options.status);
+
+      if (status) {
+        query += ` AND el.status = ?`;
+        queryParams.push(status);
       }
-      
-      if (whereConditions.length > 0) {
-        query += ` WHERE ${whereConditions.join(' AND ')}`;
-      }
-      
-      // Add ordering and pagination
-      query += ` ORDER BY l.created_at DESC LIMIT ? OFFSET ?`;
-      queryParams.push(limit, offset);
-      
-      // Execute the query
-      const [loans] = await db.query(query, queryParams);
-      
+
       // Get total count for pagination
-      const countQuery = `
-        SELECT COUNT(*) as total 
-        FROM employee_loans l
-        ${whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ')}` : ''}
-      `;
-      
-      const [countResult] = await db.query(countQuery, queryParams.slice(0, -2));
+      const [countResult] = await db.query(
+        `SELECT COUNT(*) as total FROM employee_loans el WHERE 1=1 
+         ${employeeId ? 'AND el.employee_id = ?' : ''}
+         ${status ? 'AND el.status = ?' : ''}`,
+        queryParams
+      );
       const total = countResult[0].total;
+
+      // Add sorting and pagination
+      query += ` ORDER BY ${sortBy} ${sortOrder} LIMIT ? OFFSET ?`;
+      queryParams.push(limit, offset);
+
+      // Execute query
+      const [loans] = await db.query(query, queryParams);
       
       return {
         loans,
-        totalCount: total,
-        page,
-        totalPages: Math.ceil(total / limit)
+        pagination: {
+          total,
+          limit,
+          offset,
+          totalPages: Math.ceil(total / limit)
+        }
       };
     } catch (error) {
       throw error;
     }
   }
-  
+
   /**
-   * Get a loan by ID
+   * Get a single loan by ID with payment history
    * @param {number} id - Loan ID
-   * @returns {Promise<Object>} Loan details
+   * @returns {Promise<Object>} Loan details with payment history
    */
   static async getLoanById(id) {
     try {
-      const [loans] = await db.query(`
-        SELECT l.*, e.first_name, e.last_name
-        FROM employee_loans l
-        JOIN employees e ON l.employee_id = e.id
-        WHERE l.id = ?
-      `, [id]);
-      
+      // Get loan details
+      const [loans] = await db.query(
+        `SELECT el.*, 
+          CONCAT(e.first_name, ' ', e.last_name) as employee_name,
+          e.payment_frequency
+        FROM employee_loans el
+        JOIN employees e ON el.employee_id = e.id
+        WHERE el.id = ?`,
+        [id]
+      );
+
       if (loans.length === 0) {
         return null;
       }
-      
-      // Get payment history for this loan
-      const [payments] = await db.query(`
-        SELECT lp.*, lp.payment_date
+
+      const loan = loans[0];
+
+      // Get payment history
+      const [payments] = await db.query(
+        `SELECT lp.*
         FROM loan_payments lp
-        LEFT JOIN payroll_items pi ON lp.payroll_item_id = pi.id
         WHERE lp.loan_id = ?
-        ORDER BY lp.payment_date DESC
-      `, [id]);
-      
+        ORDER BY lp.payment_date DESC`,
+        [id]
+      );
+
       return {
-        ...loans[0],
+        ...loan,
         payments
       };
     } catch (error) {
       throw error;
     }
   }
-  
+
   /**
    * Create a new employee loan
-   * @param {Object} loanData - Loan details
+   * @param {Object} loanData - Loan data
    * @returns {Promise<Object>} Created loan
    */
   static async createLoan(loanData) {
+    const connection = await db.getConnection();
+    let loanId;
+    
     try {
-      const {
-        employee_id,
-        loan_amount,
-        interest_rate,
-        installment_amount,
-        start_date,
-        expected_end_date,
-        notes
-      } = loanData;
+      await connection.beginTransaction();
       
-      // Calculate total amount (principal + interest)
-      const totalAmount = parseFloat(loan_amount) * (1 + parseFloat(interest_rate) / 100);
+      // Calculate total amount with interest
+      const principal = parseFloat(loanData.loan_amount);
+      const interestRate = parseFloat(loanData.interest_rate || 0);
+      const years = this.calculateLoanTermInYears(loanData.start_date, loanData.expected_end_date);
+      const interestAmount = principal * (interestRate / 100) * years;
+      const totalAmount = principal + interestAmount;
       
-      const [result] = await db.query(`
-        INSERT INTO employee_loans (
-          employee_id, loan_amount, interest_rate, total_amount,
-          remaining_amount, installment_amount, start_date,
-          expected_end_date, notes
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `, [
-        employee_id,
-        loan_amount,
-        interest_rate,
-        totalAmount.toFixed(2),
-        totalAmount.toFixed(2), // Initially, remaining amount equals total amount
-        installment_amount,
-        start_date,
-        expected_end_date,
-        notes || null
-      ]);
+      // Insert the new loan
+      const [result] = await connection.query(
+        `INSERT INTO employee_loans (
+          employee_id, loan_amount, interest_rate, total_amount, 
+          remaining_amount, installment_amount, start_date, expected_end_date, 
+          status, notes
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          loanData.employee_id,
+          principal,
+          interestRate,
+          totalAmount,
+          totalAmount, // Initially, remaining amount equals total amount
+          loanData.installment_amount,
+          loanData.start_date,
+          loanData.expected_end_date,
+          loanData.status || 'active',
+          loanData.notes || null
+        ]
+      );
       
-      return this.getLoanById(result.insertId);
+      await connection.commit();
+      
+      // Get the loan ID and immediately release the connection
+      loanId = result.insertId;
+      connection.release();
+      
+      // Use a separate connection from the pool for getting loan details
+      return await this.getLoanById(loanId);
+      
     } catch (error) {
+      await connection.rollback();
+      connection.release(); // Make sure to release the connection in case of error
       throw error;
     }
   }
-  
+
   /**
-   * Update an existing loan
+   * Update an existing employee loan
    * @param {number} id - Loan ID
-   * @param {Object} loanData - Updated loan details
+   * @param {Object} data - Updated loan data
    * @returns {Promise<Object>} Updated loan
    */
-  static async updateLoan(id, loanData) {
+  static async updateLoan(id, data) {
     try {
-      const allowedFields = [
-        'installment_amount',
-        'expected_end_date',
-        'status',
-        'notes'
-      ];
-      
-      // Build the update query with only allowed fields
-      const updates = [];
-      const values = [];
-      
-      Object.keys(loanData).forEach(key => {
-        if (allowedFields.includes(key)) {
-          updates.push(`${key} = ?`);
-          values.push(loanData[key]);
-        }
-      });
-      
-      // If no valid fields to update
-      if (updates.length === 0) {
-        throw new Error('No valid fields to update');
-      }
-      
-      // Add the ID to the values array
-      values.push(id);
-      
-      await db.query(`
-        UPDATE employee_loans
-        SET ${updates.join(', ')}
-        WHERE id = ?
-      `, values);
-      
-      return this.getLoanById(id);
-    } catch (error) {
-      throw error;
-    }
-  }
-  
-  /**
-   * Process loan payment as part of payroll
-   * @param {number} loanId - Loan ID
-   * @param {number} payrollItemId - Payroll item ID
-   * @param {number} paymentAmount - Payment amount
-   * @param {string} paymentDate - Payment date
-   * @returns {Promise<Object>} Payment result
-   */
-  static async processPayment(loanId, payrollItemId, paymentAmount, paymentDate) {
-    try {
-      // Start a transaction
-      await db.query('START TRANSACTION');
-      
-      // Get current loan details
-      const [loans] = await db.query('SELECT * FROM employee_loans WHERE id = ? FOR UPDATE', [loanId]);
-      
-      if (loans.length === 0) {
-        await db.query('ROLLBACK');
+      // Get the current loan state
+      const currentLoan = await this.getLoanById(id);
+      if (!currentLoan) {
         throw new Error('Loan not found');
       }
       
-      const loan = loans[0];
+      // Don't allow changing fundamental loan parameters if payments have been made
+      if (currentLoan.payments && currentLoan.payments.length > 0) {
+        // Filter out fields that can't be changed after payments
+        const { loan_amount, interest_rate, total_amount, ...allowedUpdates } = data;
+        data = allowedUpdates;
+      }
       
-      // Calculate new remaining amount
-      let remainingAmount = parseFloat(loan.remaining_amount) - parseFloat(paymentAmount);
-      remainingAmount = Math.max(remainingAmount, 0); // Ensure it doesn't go negative
+      // Update the loan
+      await db.query(
+        `UPDATE employee_loans SET
+          installment_amount = ?,
+          status = ?,
+          notes = ?,
+          updated_at = CURRENT_TIMESTAMP
+         WHERE id = ?`,
+        [
+          data.installment_amount || currentLoan.installment_amount,
+          data.status || currentLoan.status,
+          data.notes || currentLoan.notes,
+          id
+        ]
+      );
       
-      // Update loan remaining amount
-      await db.query(`
-        UPDATE employee_loans
-        SET remaining_amount = ?,
-            status = CASE
-              WHEN ? <= 0 THEN 'completed'
-              ELSE status
-            END
-        WHERE id = ?
-      `, [remainingAmount.toFixed(2), remainingAmount, loanId]);
-      
-      // Record the payment
-      const [payment] = await db.query(`
-        INSERT INTO loan_payments (
-          loan_id, payroll_item_id, payment_amount, payment_date
-        ) VALUES (?, ?, ?, ?)
-      `, [loanId, payrollItemId, paymentAmount, paymentDate]);
-      
-      // Commit the transaction
-      await db.query('COMMIT');
-      
-      return {
-        paymentId: payment.insertId,
-        loanId,
-        paymentAmount,
-        remainingAmount
-      };
+      // Return the updated loan
+      return await this.getLoanById(id);
     } catch (error) {
-      // Rollback on error
-      await db.query('ROLLBACK');
       throw error;
     }
   }
-  
+
   /**
    * Get active loans for an employee
    * @param {string} employeeId - Employee ID
-   * @returns {Promise<Array>} Active loans for employee
+   * @returns {Promise<Array>} Employee's active loans
    */
   static async getActiveLoansForEmployee(employeeId) {
     try {
-      const [loans] = await db.query(`
-        SELECT *
-        FROM employee_loans
-        WHERE employee_id = ? AND status = 'active' AND remaining_amount > 0
-        ORDER BY created_at ASC
-      `, [employeeId]);
+      const [loans] = await db.query(
+        `SELECT * FROM employee_loans 
+         WHERE employee_id = ? AND status = 'active'
+         ORDER BY created_at ASC`,
+        [employeeId]
+      );
       
       return loans;
     } catch (error) {
       throw error;
     }
+  }
+
+  /**
+   * Process a loan payment during payroll run
+   * @param {number} loanId - Loan ID
+   * @param {number} payrollItemId - Payroll item ID
+   * @param {number} amount - Payment amount
+   * @param {Date} paymentDate - Payment date
+   * @returns {Promise<Object>} Payment details
+   */
+  static async processPayment(loanId, payrollItemId, amount, paymentDate, existingConnection = null) {
+    const connection = existingConnection || await db.getConnection();
+    let paymentId;
+    
+    try {
+      if (!existingConnection) {
+        await connection.beginTransaction();
+      }
+      
+      // Get current loan details
+      const [loans] = await connection.query(
+        `SELECT * FROM employee_loans WHERE id = ?`,
+        [loanId]
+      );
+      
+      if (loans.length === 0) {
+        await connection.rollback();
+        connection.release();
+        throw new Error('Loan not found');
+      }
+      
+      const loan = loans[0];
+      const remainingBalance = parseFloat(loan.remaining_amount);
+      
+      // Check for existing payment for this payroll item to prevent duplicates
+      const [existingPayments] = await connection.query(
+        `SELECT id FROM loan_payments WHERE payroll_item_id = ? AND loan_id = ?`,
+        [payrollItemId, loanId]
+      );
+      
+      if (existingPayments.length > 0) {
+        console.warn(`Payment for payroll_item_id ${payrollItemId} and loan_id ${loanId} already exists. Skipping.`);
+        if (!existingConnection) {
+          await connection.commit();
+          connection.release();
+        }
+        return null; // Or some indicator that no new payment was made
+      }
+      
+      // Calculate principal and interest portions
+      const totalInterest = parseFloat(loan.total_amount) - parseFloat(loan.loan_amount);
+      const loanAmount = parseFloat(loan.loan_amount);
+      const principalRatio = loanAmount / parseFloat(loan.total_amount);
+      
+      let principalAmount = amount * principalRatio;
+      let interestAmount = amount - principalAmount;
+      
+      // Ensure we don't overpay
+      if (amount >= remainingBalance) {
+        amount = remainingBalance;
+        principalAmount = remainingBalance * principalRatio;
+        interestAmount = remainingBalance - principalAmount;
+      }
+      
+      // Calculate new remaining balance
+      const newRemainingBalance = Math.max(0, remainingBalance - amount);
+      
+      // Insert payment record
+      const [paymentResult] = await connection.query(
+        `INSERT INTO loan_payments (
+          loan_id, payroll_item_id, payment_amount,
+          principal_amount, interest_amount, payment_date,
+          remaining_balance
+        ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        [
+          loanId,
+          payrollItemId,
+          amount,
+          principalAmount,
+          interestAmount,
+          paymentDate,
+          newRemainingBalance
+        ]
+      );
+      
+      // Update loan remaining balance and status
+      const newStatus = newRemainingBalance <= 0 ? 'completed' : loan.status;
+      
+      await connection.query(
+        `UPDATE employee_loans
+         SET remaining_amount = ?,
+             status = ?,
+             updated_at = CURRENT_TIMESTAMP
+         WHERE id = ?`,
+        [newRemainingBalance, newStatus, loanId]
+      );
+      
+      if (!existingConnection) {
+        await connection.commit();
+      }
+      
+      // Get payment ID and immediately release the connection
+      paymentId = paymentResult.insertId;
+      
+      // Get payment details
+      const [payments] = await connection.query(
+        `SELECT * FROM loan_payments WHERE id = ?`,
+        [paymentId]
+      );
+      
+      const paymentDetails = payments[0];
+      if (!existingConnection) {
+        connection.release(); // Release the connection after all operations are complete
+      }
+      
+      return paymentDetails;
+      
+    } catch (error) {
+      if (!existingConnection) {
+        await connection.rollback();
+        connection.release(); // Make sure to release the connection in case of error
+      }
+      throw error;
+    }
+  }
+  
+  /**
+   * Calculate the term of a loan in years
+   * @param {Date|string} startDate - Loan start date
+   * @param {Date|string} endDate - Loan expected end date
+   * @returns {number} Loan term in years (decimal)
+   */
+  static calculateLoanTermInYears(startDate, endDate) {
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    const diffTime = Math.abs(end - start);
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    return diffDays / 365;
   }
 }
 

@@ -9,7 +9,7 @@ const authRoutes = require('./routes/authRoutes');
 const userRoutes = require('./routes/userRoutes');
 const employeeRoutes = require('./routes/employeeRoutes');
 const payrollRoutes = require('./routes/payrollRoutes'); 
-// Loan routes removed
+const loanRoutes = require('./routes/loanRoutes');
 
 // Load environment variables
 dotenv.config();
@@ -30,8 +30,7 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/employees', employeeRoutes);
-// Loan routes removed
-// Phase 2 routes - commented out for now
+app.use('/api/loans', loanRoutes);
 app.use('/api/payroll', payrollRoutes);
 
 // Health check route
