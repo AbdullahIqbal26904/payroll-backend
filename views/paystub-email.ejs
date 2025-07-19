@@ -55,13 +55,6 @@
           <td>$<%= (educationLevy || 0).toFixed(2) %></td>
           <td>$<%= (ytdEducationLevy || 0).toFixed(2) %></td>
         </tr>
-        <% if (loanDeduction && loanDeduction > 0) { %>
-        <tr>
-          <td>Loan Repayment</td>
-          <td>$<%= loanDeduction.toFixed(2) %></td>
-          <td>$<%= (ytdLoanDeduction || 0).toFixed(2) %></td>
-        </tr>
-        <% } %>
         <tr style="font-weight: bold;">
           <td><strong>Net Pay</strong></td>
           <td><strong>$<%= netPay.toFixed(2) %></strong></td>

@@ -12,10 +12,6 @@ Phase 2 has been implemented with the following features:
   - Education Levy (tiered rates based on salary thresholds)
 - PDF paystub generation
 - Email delivery of paystubs to employees
-- Employee Loan / Payroll Deduction management:
-  - Track loans given to employees
-  - Automatic deduction from paychecks
-  - Detailed breakdown of loan information in paystubs
 
 ## Latest Updates
 
@@ -110,15 +106,7 @@ A Postman collection is included at the root of the project (`Payroll_System_API
 | GET | `/api/payroll/settings` | Get payroll settings |
 | PUT | `/api/payroll/settings` | Update payroll settings |
 
-### Employee Loan Management (Phase 2)
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/loans` | Get all employee loans |
-| POST | `/api/loans` | Create a new employee loan |
-| GET | `/api/loans/:id` | Get details of a specific loan |
-| PUT | `/api/loans/:id` | Update a loan |
-| GET | `/api/employees/:id/loans` | Get all loans for a specific employee |
+<!-- Employee Loan Management section removed -->
 
 ### Employee Management (Admin only)
 

@@ -25,8 +25,7 @@ async function up(connection) {
         ADD COLUMN ytd_medical_benefits_employee DECIMAL(12, 2) DEFAULT 0.00 AFTER ytd_social_security_employer,
         ADD COLUMN ytd_medical_benefits_employer DECIMAL(12, 2) DEFAULT 0.00 AFTER ytd_medical_benefits_employee,
         ADD COLUMN ytd_education_levy DECIMAL(12, 2) DEFAULT 0.00 AFTER ytd_medical_benefits_employer,
-        ADD COLUMN ytd_loan_deduction DECIMAL(12, 2) DEFAULT 0.00 AFTER ytd_education_levy,
-        ADD COLUMN ytd_net_pay DECIMAL(12, 2) DEFAULT 0.00 AFTER ytd_loan_deduction,
+        ADD COLUMN ytd_net_pay DECIMAL(12, 2) DEFAULT 0.00 AFTER ytd_education_levy,
         ADD COLUMN ytd_hours_worked DECIMAL(12, 2) DEFAULT 0.00 AFTER ytd_net_pay
       `);
       
@@ -45,7 +44,6 @@ async function up(connection) {
         ytd_medical_benefits_employee DECIMAL(12, 2) DEFAULT 0.00,
         ytd_medical_benefits_employer DECIMAL(12, 2) DEFAULT 0.00,
         ytd_education_levy DECIMAL(12, 2) DEFAULT 0.00,
-        ytd_loan_deduction DECIMAL(12, 2) DEFAULT 0.00,
         ytd_net_pay DECIMAL(12, 2) DEFAULT 0.00,
         ytd_hours_worked DECIMAL(12, 2) DEFAULT 0.00,
         last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -84,7 +82,6 @@ async function down(connection) {
     DROP COLUMN IF EXISTS ytd_medical_benefits_employee,
     DROP COLUMN IF EXISTS ytd_medical_benefits_employer,
     DROP COLUMN IF EXISTS ytd_education_levy,
-    DROP COLUMN IF EXISTS ytd_loan_deduction,
     DROP COLUMN IF EXISTS ytd_net_pay,
     DROP COLUMN IF EXISTS ytd_hours_worked
   `);
