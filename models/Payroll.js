@@ -176,14 +176,41 @@ class Payroll {
               
             case 'hourly':
             default:
-              // For hourly employees, gross pay is hours worked * rate
-              // Check if we have hourly_rate or just rate in the employee data
+              // For hourly employees, calculate regular and overtime hours
               const hourlyRate = employeeData.hourly_rate !== undefined ? employeeData.hourly_rate : 
                                 (employeeData.rate !== undefined ? employeeData.rate : 0);
-              grossPay = employeeInfo.totalHours * hourlyRate;
+              
+              // Define standard hours based on payment frequency
+              let standardWeeklyHours = employeeData.standard_hours || 40; // Default to 40 hours per week
+              let standardPeriodHours;
+              
+              // Calculate period standard hours based on payment frequency
+              if (employeeData.payment_frequency === 'Weekly') {
+                standardPeriodHours = standardWeeklyHours;
+              } else if (employeeData.payment_frequency === 'Bi-Weekly') {
+                standardPeriodHours = standardWeeklyHours * 2;
+              } else if (employeeData.payment_frequency === 'Semi-Monthly') {
+                // Approximately 2.167 weeks per semi-monthly period
+                standardPeriodHours = standardWeeklyHours * 2.167;
+              } else { // Monthly
+                // Approximately 4.33 weeks per month
+                standardPeriodHours = standardWeeklyHours * 4.33;
+              }
+              
+              // Calculate regular and overtime hours
+              let regularHours = Math.min(employeeInfo.totalHours, standardPeriodHours);
+              let overtimeHours = Math.max(0, employeeInfo.totalHours - standardPeriodHours);
+              
+              // Calculate pay
+              const regularPay = regularHours * hourlyRate;
+              const overtimePay = overtimeHours * hourlyRate * 1.5; // Overtime at 1.5x
+              grossPay = regularPay + overtimePay;
               payType = 'hourly';
+              
               console.log(`Using hourly rate: ${hourlyRate} for calculation`);
-              console.log(`Calculated hourly pay: ${employeeInfo.totalHours} hours * ${employeeData.rate} rate = ${grossPay}`);
+              console.log(`Regular hours: ${regularHours} at ${hourlyRate}/hr = ${regularPay}`);
+              console.log(`Overtime hours: ${overtimeHours} at ${hourlyRate * 1.5}/hr = ${overtimePay}`);
+              console.log(`Total hourly pay: ${grossPay}`);
               break;
           }
           
@@ -196,6 +223,36 @@ class Payroll {
             employeeData.payment_frequency,
             employeeData
           );
+          
+          // Set up variables for regular and overtime hours/pay
+          let regularHours = employeeInfo.totalHours;
+          let overtimeHours = 0;
+          let overtimeAmount = 0;
+          
+          // For hourly employees, use the calculated regular and overtime hours
+          if (employeeType === 'hourly') {
+            // Define standard hours based on payment frequency
+            let standardWeeklyHours = employeeData.standard_hours || 40; // Default to 40 hours per week
+            let standardPeriodHours;
+            
+            // Calculate period standard hours based on payment frequency
+            if (employeeData.payment_frequency === 'Weekly') {
+              standardPeriodHours = standardWeeklyHours;
+            } else if (employeeData.payment_frequency === 'Bi-Weekly') {
+              standardPeriodHours = standardWeeklyHours * 2;
+            } else if (employeeData.payment_frequency === 'Semi-Monthly') {
+              standardPeriodHours = standardWeeklyHours * 2.167;
+            } else { // Monthly
+              standardPeriodHours = standardWeeklyHours * 4.33;
+            }
+            
+            const hourlyRate = employeeData.hourly_rate !== undefined ? employeeData.hourly_rate : 
+                             (employeeData.rate !== undefined ? employeeData.rate : 0);
+            
+            regularHours = Math.min(employeeInfo.totalHours, standardPeriodHours);
+            overtimeHours = Math.max(0, employeeInfo.totalHours - standardPeriodHours);
+            overtimeAmount = overtimeHours * hourlyRate * 1.5;
+          }
           
           // Insert the payroll item
           const [itemResult] = await connection.query(
@@ -212,9 +269,9 @@ class Payroll {
               `${employeeData.first_name} ${employeeData.last_name}`,
               employeeType,
               employeeInfo.totalHours,
-              employeeInfo.totalHours,  // Regular hours defaults to total hours
-              0,                         // Default overtime hours to 0
-              0,                         // Default overtime amount to 0
+              regularHours,
+              overtimeHours,
+              overtimeAmount,
               grossPay,
               deductions.socialSecurityEmployee,
               deductions.socialSecurityEmployer,
