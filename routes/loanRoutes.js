@@ -5,7 +5,9 @@ const {
   getAllLoans,
   getLoanById,
   createLoan,
-  updateLoan
+  updateLoan,
+  createThirdPartyLoan,
+  getThirdPartyPayments
 } = require('../controllers/loanController');
 
 // All routes are protected and require admin access
@@ -20,5 +22,12 @@ router.route('/')
 router.route('/:id')
   .get(getLoanById)
   .put(updateLoan);
+
+// Third-party loan specific routes
+router.route('/third-party')
+  .post(createThirdPartyLoan);
+
+router.route('/third-party-payments/:payrollRunId')
+  .get(getThirdPartyPayments);
 
 module.exports = router;

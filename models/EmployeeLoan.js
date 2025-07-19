@@ -1,5 +1,11 @@
 const db = require('../config/db');
 
+// Loan type constants
+const LOAN_TYPE = {
+  INTERNAL: 'internal',
+  THIRD_PARTY: 'third_party'
+};
+
 /**
  * @class EmployeeLoan
  * @description Model for employee loan management
@@ -125,6 +131,19 @@ class EmployeeLoan {
     try {
       await connection.beginTransaction();
       
+      // Check if employee already has a third-party loan if this is a third-party loan
+      if (loanData.loan_type === LOAN_TYPE.THIRD_PARTY) {
+        const [existingLoans] = await connection.query(
+          `SELECT COUNT(*) as count FROM employee_loans 
+           WHERE employee_id = ? AND loan_type = ? AND status IN ('active', 'pending')`,
+          [loanData.employee_id, LOAN_TYPE.THIRD_PARTY]
+        );
+        
+        if (existingLoans[0].count > 0) {
+          throw new Error('Employee already has an active third-party loan. Only one is allowed per employee.');
+        }
+      }
+      
       // Calculate total amount with interest
       const principal = parseFloat(loanData.loan_amount);
       const interestRate = parseFloat(loanData.interest_rate || 0);
@@ -137,8 +156,9 @@ class EmployeeLoan {
         `INSERT INTO employee_loans (
           employee_id, loan_amount, interest_rate, total_amount, 
           remaining_amount, installment_amount, start_date, expected_end_date, 
-          status, notes
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          status, notes, loan_type, third_party_name, third_party_account_number,
+          third_party_routing_number, third_party_reference
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           loanData.employee_id,
           principal,
@@ -149,7 +169,12 @@ class EmployeeLoan {
           loanData.start_date,
           loanData.expected_end_date,
           loanData.status || 'active',
-          loanData.notes || null
+          loanData.notes || null,
+          loanData.loan_type || LOAN_TYPE.INTERNAL,
+          loanData.third_party_name || null,
+          loanData.third_party_account_number || null,
+          loanData.third_party_routing_number || null,
+          loanData.third_party_reference || null
         ]
       );
       
@@ -370,6 +395,43 @@ class EmployeeLoan {
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
     return diffDays / 365;
   }
+  
+  /**
+   * Get third-party payment data for a specific payroll run
+   * @param {number} payrollRunId - Payroll run ID
+   * @returns {Promise<Array>} Third-party payment information
+   */
+  static async getThirdPartyPaymentsForPayrollRun(payrollRunId) {
+    try {
+      const [payments] = await db.query(
+        `SELECT 
+          lp.payment_amount,
+          el.third_party_name,
+          el.third_party_account_number,
+          el.third_party_routing_number,
+          el.third_party_reference,
+          e.first_name,
+          e.last_name,
+          e.employee_id as employee_number
+        FROM 
+          loan_payments lp
+        JOIN 
+          employee_loans el ON lp.loan_id = el.id
+        JOIN 
+          employees e ON el.employee_id = e.id
+        WHERE 
+          lp.payroll_item_id IN (SELECT id FROM payroll_items WHERE payroll_run_id = ?)
+          AND el.loan_type = ?`,
+        [payrollRunId, LOAN_TYPE.THIRD_PARTY]
+      );
+      
+      return payments;
+    } catch (error) {
+      throw error;
+    }
+  }
 }
 
+// Export the class and loan type constants
 module.exports = EmployeeLoan;
+module.exports.LOAN_TYPE = LOAN_TYPE;

@@ -286,6 +286,9 @@ class Payroll {
           
           // Process loan deductions
           let totalLoanDeduction = 0;
+          let internalLoanDeduction = 0;
+          let thirdPartyDeduction = 0;
+          
           try {
             const activeLoans = await EmployeeLoan.getActiveLoansForEmployee(employeeDbId);
             
@@ -303,6 +306,13 @@ class Payroll {
                   options.payDate || new Date(),
                   connection // Pass the existing connection to prevent deadlocks
                 );
+                
+                // Track deduction type
+                if (loan.loan_type === 'third_party') {
+                  thirdPartyDeduction += installment;
+                } else {
+                  internalLoanDeduction += installment;
+                }
                 
                 totalLoanDeduction += installment;
               }
@@ -322,9 +332,11 @@ class Payroll {
           await connection.query(
             `UPDATE payroll_items SET 
               net_pay = ?,
-              loan_deduction = ?
+              loan_deduction = ?,
+              internal_loan_deduction = ?,
+              third_party_deduction = ?
             WHERE id = ?`,
-            [finalNetPay, totalLoanDeduction, payrollItemId]
+            [finalNetPay, totalLoanDeduction, internalLoanDeduction, thirdPartyDeduction, payrollItemId]
           );
           
           // Add to payroll items list

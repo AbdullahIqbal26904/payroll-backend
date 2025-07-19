@@ -45,19 +45,19 @@ const generatePaystubPDF = async (payrollItem, periodData, options = {}) => {
       
       // Get employee details from options or directly from payrollItem
       const employeeDetails = options.employeeDetails || {};
-      const employeeName = payrollItem.employeeName || payrollItem.employee_name || 'Unknown Employee';
-      const employeeId = payrollItem.employeeId || payrollItem.employee_id || payrollItem.employee_number;
+      const employeeName = payrollItem.employee_name;
+      const employeeId = payrollItem.employee_id;
       
       // Get employee type from employee details or payrollItem
       const employeeType = employeeDetails.employee_type || payrollItem.employeeType || payrollItem.employee_type;
       
       // Get salary and hourly rate from employee details first, then payrollItem
-      const hourlyRate = employeeDetails.hourly_rate || payrollItem.hourlyRate || payrollItem.hourly_rate || 0;
-      const salaryAmount = employeeDetails.salary_amount || payrollItem.salaryAmount || payrollItem.salary_amount || 0;
-      const standardHours = employeeDetails.standard_hours || payrollItem.standardHours || payrollItem.standard_hours || 40;
+      const hourlyRate = employeeDetails.hourly_rate || payrollItem.hourly_rate || 0;
+      const salaryAmount = employeeDetails.salary_amount  || payrollItem.salary_amount || 0;
+      const standardHours = employeeDetails.standard_hours  || payrollItem.standard_hours || 40;
       
       // Calculate if salary is prorated based on hours worked compared to standard
-      const regularHours = payrollItem.regularHours || payrollItem.regular_hours || payrollItem.hours_worked || 0;
+      const regularHours = payrollItem.regular_hours ||  0;
       const isProrated = employeeType === 'salary' && parseFloat(regularHours) < (standardHours * 4);
       
       doc.text(`Name: ${employeeName}`);
@@ -239,10 +239,12 @@ const generatePaystubPDF = async (payrollItem, periodData, options = {}) => {
       doc.moveDown(0.5);
       
       // Handle both camelCase and snake_case property names for deductions
-      const socialSecurityEmployee = parseFloat(payrollItem.socialSecurityEmployee || payrollItem.social_security_employee || 0).toFixed(2);
-      const medicalBenefitsEmployee = parseFloat(payrollItem.medicalBenefitsEmployee || payrollItem.medical_benefits_employee || 0).toFixed(2);
-      const educationLevy = parseFloat(payrollItem.educationLevy || payrollItem.education_levy || 0).toFixed(2);
-      const loanDeduction = parseFloat(payrollItem.loanDeduction || payrollItem.loan_deduction || 0).toFixed(2);
+      const socialSecurityEmployee = parseFloat(payrollItem.social_security_employee || 0).toFixed(2);
+      const medicalBenefitsEmployee = parseFloat( payrollItem.medical_benefits_employee || 0).toFixed(2);
+      const educationLevy = parseFloat( payrollItem.education_levy || 0).toFixed(2);
+      const loanDeduction = parseFloat(payrollItem.loan_deduction || 0).toFixed(2);
+      const internalLoanDeduction = parseFloat( payrollItem.internal_loan_deduction || 0).toFixed(2);
+      const thirdPartyDeduction = parseFloat(payrollItem.third_party_deduction || 0).toFixed(2);
       
       // Social Security
       doc.font('Helvetica')
@@ -259,11 +261,20 @@ const generatePaystubPDF = async (payrollItem, periodData, options = {}) => {
         .text('Education Levy', 50, doc.y, { width: colWidth * 2, align: 'left' })
         .text(`$${educationLevy}`, 50 + colWidth * 2, doc.y - doc.currentLineHeight(), { width: colWidth, align: 'right' });
       
-      // Loan Deduction
-      if (parseFloat(loanDeduction) > 0) {
+      // Handle internal and third-party deductions separately
+      
+      // Internal loan deduction - shown as "Loan Repayment"
+      if (parseFloat(internalLoanDeduction) > 0) {
         doc.font('Helvetica')
           .text('Loan Repayment', 50, doc.y, { width: colWidth * 2, align: 'left' })
-          .text(`$${loanDeduction}`, 50 + colWidth * 2, doc.y - doc.currentLineHeight(), { width: colWidth, align: 'right' });
+          .text(`$${internalLoanDeduction}`, 50 + colWidth * 2, doc.y - doc.currentLineHeight(), { width: colWidth, align: 'right' });
+      }
+      
+      // Third-party loan deduction - shown as "Miscellaneous Deductions"
+      if (parseFloat(thirdPartyDeduction) > 0) {
+        doc.font('Helvetica')
+          .text('Misc. Deductions', 50, doc.y, { width: colWidth * 2, align: 'left' })
+          .text(`$${thirdPartyDeduction}`, 50 + colWidth * 2, doc.y - doc.currentLineHeight(), { width: colWidth, align: 'right' });
       }
       
       // Add horizontal line
@@ -341,33 +352,76 @@ const generatePaystubPDF = async (payrollItem, periodData, options = {}) => {
       
       
       
-      // Add loan information if present
+      // Add loan information if present (only for internal loans)
       if (options.loanDetails && options.loanDetails.length > 0) {
-        doc.moveDown(2);
-        doc.fontSize(12).font('Helvetica-Bold').text('Loan Information');
-        doc.moveDown(0.5);
+        // Filter to get only internal loans
+        const internalLoans = options.loanDetails.filter(loan => loan.loan_type !== 'third_party');
         
-        // Loan table header
-        doc.font('Helvetica-Bold')
-          .text('Loan ID', 50, doc.y, { width: colWidth / 2, align: 'left' })
-          .text('Payment', 50 + colWidth / 2, doc.y - doc.currentLineHeight(), { width: colWidth, align: 'right' })
-          .text('Remaining Balance', 50 + colWidth * 1.5, doc.y - doc.currentLineHeight(), { width: colWidth, align: 'right' })
-          .text('Status', 50 + colWidth * 2.5, doc.y - doc.currentLineHeight(), { width: colWidth, align: 'left' });
+        if (internalLoans.length > 0) {
+          doc.moveDown(2);
+          doc.fontSize(12).font('Helvetica-Bold').text('Loan Information');
+          doc.moveDown(0.5);
+          
+          // Loan table header
+          doc.font('Helvetica-Bold')
+            .text('Loan ID', 50, doc.y, { width: colWidth / 2, align: 'left' })
+            .text('Payment', 50 + colWidth / 2, doc.y - doc.currentLineHeight(), { width: colWidth, align: 'right' })
+            .text('Remaining Balance', 50 + colWidth * 1.5, doc.y - doc.currentLineHeight(), { width: colWidth, align: 'right' })
+            .text('Status', 50 + colWidth * 2.5, doc.y - doc.currentLineHeight(), { width: colWidth, align: 'left' });
+          
+          // Add horizontal line
+          doc.moveTo(50, doc.y + 5)
+            .lineTo(550, doc.y + 5)
+            .stroke();
+          doc.moveDown(0.5);
+          
+          // List each internal loan
+          internalLoans.forEach(loan => {
+            doc.font('Helvetica')
+              .text(`#${loan.id}`, 50, doc.y, { width: colWidth / 2, align: 'left' })
+              .text(`$${parseFloat(loan.payment || 0).toFixed(2)}`, 50 + colWidth / 2, doc.y - doc.currentLineHeight(), { width: colWidth, align: 'right' })
+              .text(`$${parseFloat(loan.remainingBalance).toFixed(2)}`, 50 + colWidth * 1.5, doc.y - doc.currentLineHeight(), { width: colWidth, align: 'right' })
+              .text(`${loan.status}`, 50 + colWidth * 2.5, doc.y - doc.currentLineHeight(), { width: colWidth, align: 'left' });
+          });
+        }
         
-        // Add horizontal line
-        doc.moveTo(50, doc.y + 5)
-          .lineTo(550, doc.y + 5)
-          .stroke();
-        doc.moveDown(0.5);
+        // Filter to get only third-party loans
+        const thirdPartyLoans = options.loanDetails.filter(loan => loan.loan_type === 'third_party');
         
-        // List each loan
-        options.loanDetails.forEach(loan => {
-          doc.font('Helvetica')
-            .text(`#${loan.id}`, 50, doc.y, { width: colWidth / 2, align: 'left' })
-            .text(`$${parseFloat(loan.payment || 0).toFixed(2)}`, 50 + colWidth / 2, doc.y - doc.currentLineHeight(), { width: colWidth, align: 'right' })
-            .text(`$${parseFloat(loan.remainingBalance).toFixed(2)}`, 50 + colWidth * 1.5, doc.y - doc.currentLineHeight(), { width: colWidth, align: 'right' })
-            .text(`${loan.status}`, 50 + colWidth * 2.5, doc.y - doc.currentLineHeight(), { width: colWidth, align: 'left' });
-        });
+        if (thirdPartyLoans.length > 0) {
+          doc.moveDown(2);
+          doc.fontSize(12).font('Helvetica-Bold').text('Miscellaneous Deductions');
+          doc.moveDown(0.5);
+          
+          // Table header for third-party deductions
+          const deductionColWidth = tableWidth / 4;
+          doc.font('Helvetica-Bold')
+            .text('Payee', 50, doc.y, { width: deductionColWidth, align: 'left' })
+            .text('Payment Amount', 50 + deductionColWidth, doc.y - doc.currentLineHeight(), { width: deductionColWidth, align: 'right' })
+            .text('Remaining Balance', 50 + deductionColWidth * 2, doc.y - doc.currentLineHeight(), { width: deductionColWidth, align: 'right' })
+            .text('Reference', 50 + deductionColWidth * 3, doc.y - doc.currentLineHeight(), { width: deductionColWidth, align: 'right' });
+          
+          // Add horizontal line
+          doc.moveTo(50, doc.y + 5)
+            .lineTo(550, doc.y + 5)
+            .stroke();
+          doc.moveDown(0.5);
+          
+          // List each third-party loan
+          thirdPartyLoans.forEach(loan => {
+            doc.font('Helvetica')
+              .text(loan.third_party_name || 'Third-Party Institution', 50, doc.y, { width: deductionColWidth, align: 'left' })
+              .text(`$${parseFloat(loan.payment || 0).toFixed(2)}`, 50 + deductionColWidth, doc.y - doc.currentLineHeight(), { width: deductionColWidth, align: 'right' })
+              .text(`$${parseFloat(loan.remainingBalance).toFixed(2)}`, 50 + deductionColWidth * 2, doc.y - doc.currentLineHeight(), { width: deductionColWidth, align: 'right' })
+              .text(loan.third_party_reference || 'N/A', 50 + deductionColWidth * 3, doc.y - doc.currentLineHeight(), { width: deductionColWidth, align: 'right' });
+          });
+          
+          // Add note about miscellaneous deductions
+          doc.moveDown();
+          doc.fontSize(9).font('Helvetica-Oblique')
+            .text('Note: Miscellaneous deductions represent payments made by MSA to third-party institutions on your behalf.', 
+                  50, doc.y, { width: tableWidth, align: 'left' });
+        }
       }
       
       // Add YTD Information Section
@@ -441,19 +495,99 @@ const generatePaystubPDF = async (payrollItem, periodData, options = {}) => {
         .text(`$${netPay}`, 50 + colWidth, doc.y - doc.currentLineHeight(), { width: colWidth, align: 'right' })
         .text(`$${ytdNetPay}`, 50 + colWidth * 2, doc.y - doc.currentLineHeight(), { width: colWidth, align: 'right' });
         
-      // Add Loan Information section if loan deduction exists
-      if (parseFloat(loanDeduction) > 0 && options.loanDetails && options.loanDetails.length > 0) {
+            // Add Loan Information section if internal loan deduction exists
+      if (parseFloat(internalLoanDeduction) > 0 && options.loanDetails && options.loanDetails.length > 0) {
+        // Filter to get only internal loans
+        const internalLoans = options.loanDetails.filter(loan => loan.loan_type !== 'third_party');
+        
+        if (internalLoans.length > 0) {
+          doc.moveDown(2);
+          doc.fontSize(12).font('Helvetica-Bold').text('Loan Information');
+          doc.moveDown(0.5);
+          
+          // Table header for loans
+          const loanColWidth = tableWidth / 4;
+          doc.font('Helvetica-Bold')
+            .text('Loan ID', 50, doc.y, { width: loanColWidth, align: 'left' })
+            .text('Payment Amount', 50 + loanColWidth, doc.y - doc.currentLineHeight(), { width: loanColWidth, align: 'right' })
+            .text('Remaining Balance', 50 + loanColWidth * 2, doc.y - doc.currentLineHeight(), { width: loanColWidth, align: 'right' })
+            .text('Expected End Date', 50 + loanColWidth * 3, doc.y - doc.currentLineHeight(), { width: loanColWidth, align: 'right' });
+          
+          // Add horizontal line
+          doc.moveTo(50, doc.y + 5)
+            .lineTo(550, doc.y + 5)
+            .stroke();
+          doc.moveDown(0.5);
+          
+          // List each internal loan that was processed in this payroll
+          internalLoans.forEach(loan => {
+            doc.font('Helvetica')
+              .text(`#${loan.loanId}`, 50, doc.y, { width: loanColWidth, align: 'left' })
+              .text(`$${parseFloat(loan.paymentAmount).toFixed(2)}`, 50 + loanColWidth, doc.y - doc.currentLineHeight(), { width: loanColWidth, align: 'right' })
+              .text(`$${parseFloat(loan.remainingBalance).toFixed(2)}`, 50 + loanColWidth * 2, doc.y - doc.currentLineHeight(), { width: loanColWidth, align: 'right' })
+              .text(loan.expectedEndDate || 'N/A', 50 + loanColWidth * 3, doc.y - doc.currentLineHeight(), { width: loanColWidth, align: 'right' });
+          });
+          
+          doc.moveDown();
+        }
+      }
+      
+      // Add Miscellaneous Deductions section if third-party loan deduction exists
+      if (parseFloat(thirdPartyDeduction) > 0 && options.loanDetails && options.loanDetails.length > 0) {
+        // Filter to get only third-party loans
+        const thirdPartyLoans = options.loanDetails.filter(loan => loan.loan_type === 'third_party');
+        
+        if (thirdPartyLoans.length > 0) {
+          doc.moveDown(2);
+          doc.fontSize(12).font('Helvetica-Bold').text('Miscellaneous Deductions');
+          doc.moveDown(0.5);
+          
+          // Table header for third-party deductions
+          const deductionColWidth = tableWidth / 4;
+          doc.font('Helvetica-Bold')
+            .text('Payee', 50, doc.y, { width: deductionColWidth, align: 'left' })
+            .text('Payment Amount', 50 + deductionColWidth, doc.y - doc.currentLineHeight(), { width: deductionColWidth, align: 'right' })
+            .text('Remaining Balance', 50 + deductionColWidth * 2, doc.y - doc.currentLineHeight(), { width: deductionColWidth, align: 'right' })
+            .text('Reference', 50 + deductionColWidth * 3, doc.y - doc.currentLineHeight(), { width: deductionColWidth, align: 'right' });
+          
+          // Add horizontal line
+          doc.moveTo(50, doc.y + 5)
+            .lineTo(550, doc.y + 5)
+            .stroke();
+          doc.moveDown(0.5);
+          
+          // List each third-party loan that was processed in this payroll
+          thirdPartyLoans.forEach(loan => {
+            doc.font('Helvetica')
+              .text(loan.third_party_name || 'Third-Party Institution', 50, doc.y, { width: deductionColWidth, align: 'left' })
+              .text(`$${parseFloat(loan.paymentAmount).toFixed(2)}`, 50 + deductionColWidth, doc.y - doc.currentLineHeight(), { width: deductionColWidth, align: 'right' })
+              .text(`$${parseFloat(loan.remainingBalance).toFixed(2)}`, 50 + deductionColWidth * 2, doc.y - doc.currentLineHeight(), { width: deductionColWidth, align: 'right' })
+              .text(loan.third_party_reference || 'N/A', 50 + deductionColWidth * 3, doc.y - doc.currentLineHeight(), { width: deductionColWidth, align: 'right' });
+          });
+          
+          // Add note about miscellaneous deductions
+          doc.moveDown();
+          doc.fontSize(9).font('Helvetica-Oblique')
+            .text('Note: Miscellaneous deductions represent payments made by MSA to third-party institutions on your behalf.', 
+                  50, doc.y, { width: tableWidth, align: 'left' });
+          
+          doc.moveDown();
+        }
+      }
+      
+      // Add Miscellaneous Deductions section if third-party loan deduction exists
+      if (parseFloat(thirdPartyDeduction) > 0 && options.loanDetails && options.loanDetails.length > 0) {
         doc.moveDown(2);
-        doc.fontSize(12).font('Helvetica-Bold').text('Loan Information');
+        doc.fontSize(12).font('Helvetica-Bold').text('Miscellaneous Deductions');
         doc.moveDown(0.5);
         
-        // Table header for loans
-        const loanColWidth = tableWidth / 4;
+        // Table header for third-party deductions
+        const deductionColWidth = tableWidth / 4;
         doc.font('Helvetica-Bold')
-          .text('Loan ID', 50, doc.y, { width: loanColWidth, align: 'left' })
-          .text('Payment Amount', 50 + loanColWidth, doc.y - doc.currentLineHeight(), { width: loanColWidth, align: 'right' })
-          .text('Remaining Balance', 50 + loanColWidth * 2, doc.y - doc.currentLineHeight(), { width: loanColWidth, align: 'right' })
-          .text('Expected End Date', 50 + loanColWidth * 3, doc.y - doc.currentLineHeight(), { width: loanColWidth, align: 'right' });
+          .text('Payee', 50, doc.y, { width: deductionColWidth, align: 'left' })
+          .text('Payment Amount', 50 + deductionColWidth, doc.y - doc.currentLineHeight(), { width: deductionColWidth, align: 'right' })
+          .text('Remaining Balance', 50 + deductionColWidth * 2, doc.y - doc.currentLineHeight(), { width: deductionColWidth, align: 'right' })
+          .text('Reference', 50 + deductionColWidth * 3, doc.y - doc.currentLineHeight(), { width: deductionColWidth, align: 'right' });
         
         // Add horizontal line
         doc.moveTo(50, doc.y + 5)
@@ -461,14 +595,23 @@ const generatePaystubPDF = async (payrollItem, periodData, options = {}) => {
           .stroke();
         doc.moveDown(0.5);
         
-        // List each loan that was processed in this payroll
+        // List each third-party loan that was processed in this payroll
         options.loanDetails.forEach(loan => {
-          doc.font('Helvetica')
-            .text(`#${loan.loanId}`, 50, doc.y, { width: loanColWidth, align: 'left' })
-            .text(`$${parseFloat(loan.paymentAmount).toFixed(2)}`, 50 + loanColWidth, doc.y - doc.currentLineHeight(), { width: loanColWidth, align: 'right' })
-            .text(`$${parseFloat(loan.remainingBalance).toFixed(2)}`, 50 + loanColWidth * 2, doc.y - doc.currentLineHeight(), { width: loanColWidth, align: 'right' })
-            .text(loan.expectedEndDate || 'N/A', 50 + loanColWidth * 3, doc.y - doc.currentLineHeight(), { width: loanColWidth, align: 'right' });
+          // Only show third-party loans in this section
+          if (loan.loan_type === 'third_party') {
+            doc.font('Helvetica')
+              .text(loan.third_party_name || 'Third-Party Institution', 50, doc.y, { width: deductionColWidth, align: 'left' })
+              .text(`$${parseFloat(loan.paymentAmount).toFixed(2)}`, 50 + deductionColWidth, doc.y - doc.currentLineHeight(), { width: deductionColWidth, align: 'right' })
+              .text(`$${parseFloat(loan.remainingBalance).toFixed(2)}`, 50 + deductionColWidth * 2, doc.y - doc.currentLineHeight(), { width: deductionColWidth, align: 'right' })
+              .text(loan.third_party_reference || 'N/A', 50 + deductionColWidth * 3, doc.y - doc.currentLineHeight(), { width: deductionColWidth, align: 'right' });
+          }
         });
+        
+        // Add note about miscellaneous deductions
+        doc.moveDown();
+        doc.fontSize(9).font('Helvetica-Oblique')
+          .text('Note: Miscellaneous deductions represent payments made by MSA to third-party institutions on your behalf.', 
+                50, doc.y, { width: tableWidth, align: 'left' });
         
         doc.moveDown();
       }

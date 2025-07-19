@@ -437,7 +437,10 @@ exports.downloadPaystub = async (req, res) => {
       const [loanPayments] = await db.query(`
         SELECT 
           lp.*, 
-          el.expected_end_date
+          el.expected_end_date,
+          el.loan_type,
+          el.third_party_name,
+          el.third_party_reference
         FROM 
           loan_payments lp
         JOIN 
@@ -451,7 +454,10 @@ exports.downloadPaystub = async (req, res) => {
           loanId: payment.loan_id,
           paymentAmount: payment.payment_amount,
           remainingBalance: payment.remaining_balance,
-          expectedEndDate: payment.expected_end_date ? new Date(payment.expected_end_date).toLocaleDateString() : null
+          expectedEndDate: payment.expected_end_date ? new Date(payment.expected_end_date).toLocaleDateString() : null,
+          loan_type: payment.loan_type || 'internal',
+          third_party_name: payment.third_party_name,
+          third_party_reference: payment.third_party_reference
         }));
       }
     }
