@@ -412,7 +412,7 @@ class EmployeeLoan {
           el.third_party_reference,
           e.first_name,
           e.last_name,
-          e.employee_id as employee_number
+          e.id as employee_number
         FROM 
           loan_payments lp
         JOIN 
