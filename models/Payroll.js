@@ -339,6 +339,61 @@ class Payroll {
             [finalNetPay, totalLoanDeduction, internalLoanDeduction, thirdPartyDeduction, payrollItemId]
           );
           
+          // Calculate YTD totals for this employee up to the pay date
+          const payDate = options.payDate || new Date();
+          try {
+            // Calculate YTD totals for the employee
+            const ytdData = await this.calculateYTDTotals(employeeDbId, payDate);
+            
+            // Add current payroll values to YTD totals
+            const updatedYtdData = {
+              ytd_gross_pay: ytdData.ytd_gross_pay + grossPay,
+              ytd_social_security_employee: ytdData.ytd_social_security_employee + deductions.socialSecurityEmployee,
+              ytd_social_security_employer: ytdData.ytd_social_security_employer + deductions.socialSecurityEmployer,
+              ytd_medical_benefits_employee: ytdData.ytd_medical_benefits_employee + deductions.medicalBenefitsEmployee,
+              ytd_medical_benefits_employer: ytdData.ytd_medical_benefits_employer + deductions.medicalBenefitsEmployer,
+              ytd_education_levy: ytdData.ytd_education_levy + deductions.educationLevy,
+              ytd_net_pay: ytdData.ytd_net_pay + finalNetPay,
+              ytd_hours_worked: ytdData.ytd_hours_worked + employeeInfo.totalHours
+            };
+            
+            // Update payroll item with YTD totals
+            await connection.query(
+              `UPDATE payroll_items SET 
+                ytd_gross_pay = ?,
+                ytd_social_security_employee = ?,
+                ytd_social_security_employer = ?,
+                ytd_medical_benefits_employee = ?,
+                ytd_medical_benefits_employer = ?,
+                ytd_education_levy = ?,
+                ytd_net_pay = ?,
+                ytd_hours_worked = ?
+              WHERE id = ?`,
+              [
+                updatedYtdData.ytd_gross_pay,
+                updatedYtdData.ytd_social_security_employee,
+                updatedYtdData.ytd_social_security_employer,
+                updatedYtdData.ytd_medical_benefits_employee,
+                updatedYtdData.ytd_medical_benefits_employer,
+                updatedYtdData.ytd_education_levy,
+                updatedYtdData.ytd_net_pay,
+                updatedYtdData.ytd_hours_worked,
+                payrollItemId
+              ]
+            );
+            
+            // Update the YTD summary table
+            await this.updateYTDSummary(employeeDbId, updatedYtdData, payDate.getFullYear());
+            
+          } catch (ytdError) {
+            console.error(`Error processing YTD data for employee ${employeeDbId}:`, ytdError);
+            errors.push({
+              employeeId: employeeDbId,
+              employeeName: `${employeeData.first_name} ${employeeData.last_name}`,
+              error: `Failed to process YTD calculations: ${ytdError.message}`
+            });
+          }
+          
           // Add to payroll items list
           payrollItems.push({
             payrollItemId,
