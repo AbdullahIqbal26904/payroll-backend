@@ -462,10 +462,14 @@ exports.downloadPaystub = async (req, res) => {
       }
     }
     
-    // Generate PDF with employee details and loan information
+    // Get payroll settings for the PDF
+    const [payrollSettings] = await db.query('SELECT * FROM payroll_settings LIMIT 1');
+    
+    // Generate PDF with employee details, loan information, and payroll settings
     const pdfBuffer = await generatePaystubPDF(payrollItem, periodData, { 
       employeeDetails,
-      loanDetails
+      loanDetails,
+      payrollSettings: payrollSettings[0] || {}
     });
     
     // Set headers for PDF download
@@ -523,7 +527,13 @@ exports.updatePayrollSettings = async (req, res) => {
       educationLevyExemption,
       retirementAge,
       medicalBenefitsSeniorAge,
-      medicalBenefitsMaxAge
+      medicalBenefitsMaxAge,
+      // New private duty nurse rates
+      privateDutyNurseDayWeekday,
+      privateDutyNurseNightAll,
+      privateDutyNurseDayWeekend,
+      privateDutyNurseDayStart,
+      privateDutyNurseDayEnd
     } = req.body;
     
     const [result] = await db.query(
@@ -541,6 +551,11 @@ exports.updatePayrollSettings = async (req, res) => {
         retirement_age = COALESCE(?, retirement_age),
         medical_benefits_senior_age = COALESCE(?, medical_benefits_senior_age),
         medical_benefits_max_age = COALESCE(?, medical_benefits_max_age),
+        private_duty_nurse_day_weekday = COALESCE(?, private_duty_nurse_day_weekday),
+        private_duty_nurse_night_all = COALESCE(?, private_duty_nurse_night_all),
+        private_duty_nurse_day_weekend = COALESCE(?, private_duty_nurse_day_weekend),
+        private_duty_nurse_day_start = COALESCE(?, private_duty_nurse_day_start),
+        private_duty_nurse_day_end = COALESCE(?, private_duty_nurse_day_end),
         updated_at = CURRENT_TIMESTAMP
        WHERE id = 1`,
       [
@@ -556,7 +571,12 @@ exports.updatePayrollSettings = async (req, res) => {
         educationLevyExemption,
         retirementAge,
         medicalBenefitsSeniorAge,
-        medicalBenefitsMaxAge
+        medicalBenefitsMaxAge,
+        privateDutyNurseDayWeekday,
+        privateDutyNurseNightAll,
+        privateDutyNurseDayWeekend,
+        privateDutyNurseDayStart,
+        privateDutyNurseDayEnd
       ]
     );
     

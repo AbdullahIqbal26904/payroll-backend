@@ -147,7 +147,7 @@ class Payroll {
               break;
               
             case 'private_duty_nurse':
-              // For private duty nurses, calculate pay based on daily rates
+              // For private duty nurses, calculate pay based on rates that vary by time of day and day of week
               let totalNursePay = 0;
               const dailyEntries = {};
               
@@ -161,13 +161,58 @@ class Payroll {
                 dailyEntries[entryDate].entries.push(entry);
               });
               
+              // Get the nurse rate settings from payroll settings
+              let dayWeekdayRate = 35.00; // Default fallback value
+              let nightAllRate = 40.00;   // Default fallback value
+              let dayWeekendRate = 40.00; // Default fallback value
+              let dayStartHour = 7;       // Default start time for day shift (7am)
+              let dayEndHour = 19;        // Default end time for day shift (7pm)
+              
+              // Check if we have payroll settings with custom rates
+              if (payrollSettings) {
+                dayWeekdayRate = payrollSettings.private_duty_nurse_day_weekday || dayWeekdayRate;
+                nightAllRate = payrollSettings.private_duty_nurse_night_all || nightAllRate;
+                dayWeekendRate = payrollSettings.private_duty_nurse_day_weekend || dayWeekendRate;
+                
+                // Parse shift start/end times if available
+                if (payrollSettings.private_duty_nurse_day_start) {
+                  const dayStartTime = payrollSettings.private_duty_nurse_day_start;
+                  dayStartHour = typeof dayStartTime === 'string' ? 
+                    parseInt(dayStartTime.split(':')[0]) : dayStartHour;
+                }
+                
+                if (payrollSettings.private_duty_nurse_day_end) {
+                  const dayEndTime = payrollSettings.private_duty_nurse_day_end;
+                  dayEndHour = typeof dayEndTime === 'string' ? 
+                    parseInt(dayEndTime.split(':')[0]) : dayEndHour;
+                }
+              }
+              
               // Calculate pay for each day
               for (const dateStr in dailyEntries) {
                 const day = dailyEntries[dateStr];
-                const rate = 35; // Example rate, should be configurable
+                const date = new Date(dateStr);
+                const dayOfWeek = date.getDay(); // 0 = Sunday, 6 = Saturday
+                const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+                
+                // Determine hourly rate based on shift and day of week
+                let rate;
+                const timeIn = day.entries[0]?.time_in;
+                const hourOfDay = timeIn ? parseInt(timeIn.split(':')[0]) : 12;
+                
+                const isDayShift = hourOfDay >= dayStartHour && hourOfDay < dayEndHour;
+                
+                if (isDayShift) {
+                  // Day shift
+                  rate = isWeekend ? dayWeekendRate : dayWeekdayRate;
+                } else {
+                  // Night shift (same rate for all days)
+                  rate = nightAllRate;
+                }
+                
                 const dailyPay = day.totalHours * rate;
                 totalNursePay += dailyPay;
-                console.log(`Private duty nurse pay for ${new Date(dateStr)}: ${day.totalHours} hours at $${rate}/hr = $${dailyPay}`);
+                console.log(`Private duty nurse pay for ${date.toLocaleDateString()}: ${day.totalHours} hours at $${rate}/hr = $${dailyPay}`);
               }
               
               grossPay = totalNursePay;

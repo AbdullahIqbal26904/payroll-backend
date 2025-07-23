@@ -78,7 +78,16 @@ const generatePaystubPDF = async (payrollItem, periodData, options = {}) => {
           doc.text(`Salary Status: Prorated (worked ${regularHours} of ${standardHours * 4} monthly hours)`);
         }
       } else if (employeeType === 'private_duty_nurse') {
-        doc.text(`Hourly Rate: Variable (shift-based)`);
+        // Get private duty nurse rates from payroll settings if available
+        const nurseSetting = options.payrollSettings || {};
+        const dayWeekdayRate = nurseSetting.private_duty_nurse_day_weekday || 35.00;
+        const nightAllRate = nurseSetting.private_duty_nurse_night_all || 40.00;
+        const dayWeekendRate = nurseSetting.private_duty_nurse_day_weekend || 40.00;
+        
+        doc.text(`Hourly Rate: Variable (shift-based):`);
+        doc.text(`  • Weekday Day Rate (7am-7pm): $${parseFloat(dayWeekdayRate).toFixed(2)}`);
+        doc.text(`  • Weekend Day Rate (7am-7pm): $${parseFloat(dayWeekendRate).toFixed(2)}`);
+        doc.text(`  • Night Rate (7pm-7am): $${parseFloat(nightAllRate).toFixed(2)}`);
       } else {
         doc.text(`Hourly Rate: $${parseFloat(hourlyRate || 0).toFixed(2)}`);
       }
