@@ -1,8 +1,8 @@
-# Payroll System API Updates - June 2025
+# Payroll System API Updates - July 2025
 
 ## Database Schema Updates
 
-Two new migrations have been added to update the database schema:
+Multiple new migrations have been added to update the database schema:
 
 1. **010_update_employees_table.js**: Adds the following columns to the employees table:
    - `hourly_rate`: DECIMAL(10,2) - Hourly rate for the employee
@@ -13,6 +13,12 @@ Two new migrations have been added to update the database schema:
 2. **011_update_payroll_items.js**: Adds the following column to the payroll_items table:
    - `total_employer_contributions`: DECIMAL(10,2) - Sum of all employer contributions
 
+3. **021_add_vacation_entitlement.js**: Creates the employee_vacations table and adds vacation-related columns to the payroll_items and ytd_summary tables:
+   - `vacation_hours`: DECIMAL(10,2) - Vacation hours taken in the pay period
+   - `vacation_amount`: DECIMAL(10,2) - Vacation pay amount for the pay period
+   - `ytd_vacation_hours`: DECIMAL(10,2) - Year-to-date vacation hours
+   - `ytd_vacation_amount`: DECIMAL(10,2) - Year-to-date vacation pay
+
 ## Payroll Calculation Logic Updates
 
 The payroll calculation logic has been updated to:
@@ -20,6 +26,12 @@ The payroll calculation logic has been updated to:
 1. Use hourly rate for bi-weekly payment calculation instead of approximating from salary
 2. Use the correct database field names for exemption flags (`is_exempt_ss` and `is_exempt_medical`)
 3. Calculate and store total employer contributions separately
+4. Include vacation hours and pay in payroll calculations
+5. Track vacation hours separately from regular worked hours
+6. Apply vacation pay based on employee type:
+   - Hourly employees: Vacation hours × Hourly rate
+   - Salaried employees: Track vacation hours but pay is included in salary
+   - Private duty nurses: Vacation hours × Hourly rate
 
 ## Key Rules for Payroll Calculations
 

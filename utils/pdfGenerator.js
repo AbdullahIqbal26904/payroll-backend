@@ -120,9 +120,13 @@ const generatePaystubPDF = async (payrollItem, periodData, options = {}) => {
       const overtimeHours = payrollItem.overtimeHours || payrollItem.overtime_hours || 0;
       const overtimeAmount = parseFloat(payrollItem.overtimeAmount || payrollItem.overtime_amount || 0).toFixed(2);
       
-      // Calculate regular earnings (gross pay minus overtime)
+      // Get vacation hours and pay
+      const vacationHours = payrollItem.vacationHours || payrollItem.vacation_hours || 0;
+      const vacationAmount = parseFloat(payrollItem.vacationAmount || payrollItem.vacation_amount || 0).toFixed(2);
+      
+      // Calculate regular earnings (gross pay minus overtime and vacation)
       const grossPay = parseFloat(payrollItem.grossPay || payrollItem.gross_pay || 0).toFixed(2);
-      const regularEarnings = (parseFloat(grossPay) - parseFloat(overtimeAmount)).toFixed(2);
+      const regularEarnings = (parseFloat(grossPay) - parseFloat(overtimeAmount) - parseFloat(vacationAmount)).toFixed(2);
       
       // Log data for debugging
       console.log('PDF Generation - Payroll Item:', {
@@ -132,7 +136,9 @@ const generatePaystubPDF = async (payrollItem, periodData, options = {}) => {
         grossPay: grossPay,
         regularHours: regularHours,
         overtimeHours: overtimeHours,
-        overtimeAmount: overtimeAmount
+        overtimeAmount: overtimeAmount,
+        vacationHours: vacationHours,
+        vacationAmount: vacationAmount
       });
       
       // Regular earnings
@@ -172,8 +178,17 @@ const generatePaystubPDF = async (payrollItem, periodData, options = {}) => {
             `Overtime calculation: Annual salary $${annualSalary.toFixed(2)} ÷ 52 weeks ÷ 40 hours × 1.5 = $${(hourlyBase * 1.5).toFixed(2)}/hour`, 
             50, doc.y + 5, { width: tableWidth, align: 'left' }
           );
-          doc.fontSize(10);
         }
+      }
+      
+      // Add vacation pay if applicable
+      if (parseFloat(vacationHours) > 0 || parseFloat(vacationAmount) > 0) {
+        doc.moveDown(0.5);
+        doc.font('Helvetica')
+          .text('Vacation Pay', 50, doc.y, { width: colWidth, align: 'left' })
+          .text(vacationHours.toString(), 50 + colWidth, doc.y - doc.currentLineHeight(), { width: colWidth, align: 'right' })
+          .text(`$${vacationAmount}`, 50 + colWidth * 2, doc.y - doc.currentLineHeight(), { width: colWidth, align: 'right' });
+        doc.fontSize(10);
       }
       
       // Add horizontal line
@@ -384,6 +399,8 @@ const generatePaystubPDF = async (payrollItem, periodData, options = {}) => {
       // Loan functionality removed
       const ytdNetPay = parseFloat(payrollItem.ytdNetPay || payrollItem.ytd_net_pay || 0).toFixed(2);
       const ytdHoursWorked = parseFloat(payrollItem.ytdHoursWorked || payrollItem.ytd_hours_worked || 0).toFixed(2);
+      const ytdVacationHours = parseFloat(payrollItem.ytdVacationHours || payrollItem.ytd_vacation_hours || 0).toFixed(2);
+      const ytdVacationAmount = parseFloat(payrollItem.ytdVacationAmount || payrollItem.ytd_vacation_amount || 0).toFixed(2);
       
       // Gross Pay YTD
       doc.font('Helvetica')
@@ -416,6 +433,20 @@ const generatePaystubPDF = async (payrollItem, periodData, options = {}) => {
         .text('Hours Worked', 50, doc.y, { width: colWidth, align: 'left' })
         .text(hoursWorked.toString(), 50 + colWidth, doc.y - doc.currentLineHeight(), { width: colWidth, align: 'right' })
         .text(ytdHoursWorked, 50 + colWidth * 2, doc.y - doc.currentLineHeight(), { width: colWidth, align: 'right' });
+      
+      // Vacation Hours YTD
+      if (parseFloat(vacationHours) > 0 || parseFloat(ytdVacationHours) > 0) {
+        doc.font('Helvetica')
+          .text('Vacation Hours', 50, doc.y, { width: colWidth, align: 'left' })
+          .text(vacationHours.toString(), 50 + colWidth, doc.y - doc.currentLineHeight(), { width: colWidth, align: 'right' })
+          .text(ytdVacationHours, 50 + colWidth * 2, doc.y - doc.currentLineHeight(), { width: colWidth, align: 'right' });
+          
+        // Vacation Pay YTD
+        doc.font('Helvetica')
+          .text('Vacation Pay', 50, doc.y, { width: colWidth, align: 'left' })
+          .text(`$${vacationAmount}`, 50 + colWidth, doc.y - doc.currentLineHeight(), { width: colWidth, align: 'right' })
+          .text(`$${ytdVacationAmount}`, 50 + colWidth * 2, doc.y - doc.currentLineHeight(), { width: colWidth, align: 'right' });
+      }
       
       // Add horizontal line
       doc.moveDown();

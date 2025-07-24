@@ -28,6 +28,16 @@ exports.employeeValidation = [
   check('is_exempt_medical', 'Medical benefits exemption must be a boolean').optional().isBoolean()
 ];
 
+// Validation for vacation entry
+exports.validateVacationEntry = [
+  check('employee_id', 'Employee ID is required').not().isEmpty(),
+  check('start_date', 'Start date must be a valid date').isDate(),
+  check('end_date', 'End date must be a valid date').isDate(),
+  check('total_hours', 'Total hours must be a valid number').isNumeric(),
+  check('hourly_rate', 'Hourly rate must be a valid number').optional().isNumeric(),
+  check('status', 'Status must be pending, approved, or cancelled').optional().isIn(['pending', 'approved', 'cancelled'])
+];
+
 // Middleware to validate request
 exports.validateRequest = (req, res, next) => {
   const errors = validationResult(req);

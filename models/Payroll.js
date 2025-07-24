@@ -1,5 +1,6 @@
 const db = require('../config/db');
 const EmployeeLoan = require('./EmployeeLoan');
+const EmployeeVacation = require('./EmployeeVacation');
 
 /**
  * @class Payroll
@@ -126,6 +127,34 @@ class Payroll {
                            (employeeData.rate !== undefined ? employeeData.rate : '0.00');
           console.log(`Employee data found: ${employeeData.first_name} ${employeeData.last_name}, Salary: ${salaryToLog}, Rate: ${rateToLog}, Frequency: ${employeeData.payment_frequency}`);
           
+          // Get vacation entries for this employee during this period
+          let vacationData = {
+            vacationHours: 0,
+            vacationPay: 0,
+            vacationEntries: []
+          };
+          
+          try {
+            vacationData = await EmployeeVacation.calculateVacationForPeriod(
+              employeeDbId, 
+              period.period_start, 
+              period.period_end, 
+              employeeData
+            );
+            
+            if (vacationData.vacationHours > 0) {
+              console.log(`Found ${vacationData.vacationHours} vacation hours for ${employeeData.first_name} ${employeeData.last_name}`);
+              console.log(`Vacation pay: $${vacationData.vacationPay}`);
+            }
+          } catch (vacationError) {
+            console.error(`Error retrieving vacation data for employee ${employeeDbId}:`, vacationError);
+            errors.push({
+              employeeId: employeeDbId,
+              employeeName: `${employeeData.first_name} ${employeeData.last_name}`,
+              error: `Failed to process vacation data: ${vacationError.message}`
+            });
+          }
+          
           // Initialize payroll item data
           let grossPay = 0;
           let payType = 'unknown';
@@ -142,6 +171,17 @@ class Payroll {
               const salaryAmount = employeeData.salary_amount !== undefined ? employeeData.salary_amount : 
                                   (employeeData.salary !== undefined ? employeeData.salary : 0);
               grossPay = salaryAmount / payPeriods;
+              
+              // For salaried employees, vacation hours are counted as worked hours
+              // but don't affect gross pay (already included in salary)
+              // We set vacationPay to 0 as it's already included in the salary
+              vacationData.vacationPay = 0;
+              
+              // Log vacation hours if any
+              if (vacationData.vacationHours > 0) {
+                console.log(`Salaried employee vacation: ${vacationData.vacationHours} hours (included in salary)`);
+              }
+              
               payType = 'salary';
               console.log(`Calculated salary pay: Base ${employeeData.salary}, Overtime 0, Total ${grossPay}`);
               break;
@@ -215,8 +255,14 @@ class Payroll {
                 console.log(`Private duty nurse pay for ${date.toLocaleDateString()}: ${day.totalHours} hours at $${rate}/hr = $${dailyPay}`);
               }
               
-              grossPay = totalNursePay;
+              // Add vacation pay for private duty nurses
+              grossPay = totalNursePay + vacationData.vacationPay;
               payType = 'private_duty_nurse';
+              
+              if (vacationData.vacationHours > 0) {
+                console.log(`Private duty nurse vacation pay: ${vacationData.vacationHours} hours = $${vacationData.vacationPay}`);
+                console.log(`Total nurse pay including vacation: $${grossPay}`);
+              }
               break;
               
             case 'hourly':
@@ -242,20 +288,23 @@ class Payroll {
                 standardPeriodHours = standardWeeklyHours * 4.33;
               }
               
-              // Calculate regular and overtime hours
+              // Calculate regular and overtime hours - include only worked hours, not vacation
               let regularHours = Math.min(employeeInfo.totalHours, standardPeriodHours);
               let overtimeHours = Math.max(0, employeeInfo.totalHours - standardPeriodHours);
               
-              // Calculate pay
+              // Calculate regular pay for worked hours
               const regularPay = regularHours * hourlyRate;
               const overtimePay = overtimeHours * hourlyRate * 1.5; // Overtime at 1.5x
-              grossPay = regularPay + overtimePay;
+              
+              // Add vacation pay for hourly employees
+              grossPay = regularPay + overtimePay + vacationData.vacationPay;
               payType = 'hourly';
               
               console.log(`Using hourly rate: ${hourlyRate} for calculation`);
               console.log(`Regular hours: ${regularHours} at ${hourlyRate}/hr = ${regularPay}`);
               console.log(`Overtime hours: ${overtimeHours} at ${hourlyRate * 1.5}/hr = ${overtimePay}`);
-              console.log(`Total hourly pay: ${grossPay}`);
+              console.log(`Vacation hours: ${vacationData.vacationHours} with pay = ${vacationData.vacationPay}`);
+              console.log(`Total hourly pay: ${grossPay} (regular + overtime + vacation)`);
               break;
           }
           
@@ -269,10 +318,12 @@ class Payroll {
             employeeData
           );
           
-          // Set up variables for regular and overtime hours/pay
+          // Set up variables for regular, overtime, and vacation hours/pay
           let regularHours = employeeInfo.totalHours;
           let overtimeHours = 0;
           let overtimeAmount = 0;
+          let vacationHours = vacationData.vacationHours || 0;
+          let vacationAmount = vacationData.vacationPay || 0;
           
           // For hourly employees, use the calculated regular and overtime hours
           if (employeeType === 'hourly') {
@@ -303,11 +354,12 @@ class Payroll {
           const [itemResult] = await connection.query(
             `INSERT INTO payroll_items (
               payroll_run_id, employee_id, employee_name, employee_type,
-              hours_worked, regular_hours, overtime_hours, overtime_amount, gross_pay,
+              hours_worked, regular_hours, overtime_hours, overtime_amount, 
+              vacation_hours, vacation_amount, gross_pay,
               social_security_employee, social_security_employer,
               medical_benefits_employee, medical_benefits_employer,
               education_levy, net_pay
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [
               payrollRunId,
               employeeDbId,
@@ -317,6 +369,8 @@ class Payroll {
               regularHours,
               overtimeHours,
               overtimeAmount,
+              vacationHours,
+              vacationAmount,
               grossPay,
               deductions.socialSecurityEmployee,
               deductions.socialSecurityEmployer,
@@ -399,7 +453,9 @@ class Payroll {
               ytd_medical_benefits_employer: ytdData.ytd_medical_benefits_employer + deductions.medicalBenefitsEmployer,
               ytd_education_levy: ytdData.ytd_education_levy + deductions.educationLevy,
               ytd_net_pay: ytdData.ytd_net_pay + finalNetPay,
-              ytd_hours_worked: ytdData.ytd_hours_worked + employeeInfo.totalHours
+              ytd_hours_worked: ytdData.ytd_hours_worked + employeeInfo.totalHours,
+              ytd_vacation_hours: (ytdData.ytd_vacation_hours || 0) + vacationHours,
+              ytd_vacation_amount: (ytdData.ytd_vacation_amount || 0) + vacationAmount
             };
             
             // Update payroll item with YTD totals
@@ -412,7 +468,9 @@ class Payroll {
                 ytd_medical_benefits_employer = ?,
                 ytd_education_levy = ?,
                 ytd_net_pay = ?,
-                ytd_hours_worked = ?
+                ytd_hours_worked = ?,
+                ytd_vacation_hours = ?,
+                ytd_vacation_amount = ?
               WHERE id = ?`,
               [
                 updatedYtdData.ytd_gross_pay,
@@ -423,6 +481,8 @@ class Payroll {
                 updatedYtdData.ytd_education_levy,
                 updatedYtdData.ytd_net_pay,
                 updatedYtdData.ytd_hours_worked,
+                updatedYtdData.ytd_vacation_hours,
+                updatedYtdData.ytd_vacation_amount,
                 payrollItemId
               ]
             );
@@ -750,7 +810,9 @@ class Payroll {
           SUM(medical_benefits_employer) as ytd_medical_benefits_employer,
           SUM(education_levy) as ytd_education_levy,
           SUM(net_pay) as ytd_net_pay,
-          SUM(hours_worked) as ytd_hours_worked
+          SUM(hours_worked) as ytd_hours_worked,
+          SUM(vacation_hours) as ytd_vacation_hours,
+          SUM(vacation_amount) as ytd_vacation_amount
         FROM payroll_items pi
         JOIN payroll_runs pr ON pi.payroll_run_id = pr.id
         WHERE pi.employee_id = ? 
@@ -771,7 +833,9 @@ class Payroll {
         ytd_medical_benefits_employer: parseFloat(result.ytd_medical_benefits_employer || 0),
         ytd_education_levy: parseFloat(result.ytd_education_levy || 0),
         ytd_net_pay: parseFloat(result.ytd_net_pay || 0),
-        ytd_hours_worked: parseFloat(result.ytd_hours_worked || 0)
+        ytd_hours_worked: parseFloat(result.ytd_hours_worked || 0),
+        ytd_vacation_hours: parseFloat(result.ytd_vacation_hours || 0),
+        ytd_vacation_amount: parseFloat(result.ytd_vacation_amount || 0)
       };
     } catch (error) {
       throw error;
@@ -792,8 +856,8 @@ class Payroll {
         (employee_id, year, ytd_gross_pay, ytd_social_security_employee, 
          ytd_social_security_employer, ytd_medical_benefits_employee, 
          ytd_medical_benefits_employer, ytd_education_levy, 
-         ytd_net_pay, ytd_hours_worked) 
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         ytd_net_pay, ytd_hours_worked, ytd_vacation_hours, ytd_vacation_amount) 
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON DUPLICATE KEY UPDATE 
         ytd_gross_pay = VALUES(ytd_gross_pay),
         ytd_social_security_employee = VALUES(ytd_social_security_employee),
@@ -802,7 +866,9 @@ class Payroll {
         ytd_medical_benefits_employer = VALUES(ytd_medical_benefits_employer),
         ytd_education_levy = VALUES(ytd_education_levy),
         ytd_net_pay = VALUES(ytd_net_pay),
-        ytd_hours_worked = VALUES(ytd_hours_worked)`,
+        ytd_hours_worked = VALUES(ytd_hours_worked),
+        ytd_vacation_hours = VALUES(ytd_vacation_hours),
+        ytd_vacation_amount = VALUES(ytd_vacation_amount)`,
         [
           employeeId, year,
           ytdData.ytd_gross_pay,
@@ -812,7 +878,9 @@ class Payroll {
           ytdData.ytd_medical_benefits_employer,
           ytdData.ytd_education_levy,
           ytdData.ytd_net_pay,
-          ytdData.ytd_hours_worked
+          ytdData.ytd_hours_worked,
+          ytdData.ytd_vacation_hours,
+          ytdData.ytd_vacation_amount
         ]
       );
     } catch (error) {
