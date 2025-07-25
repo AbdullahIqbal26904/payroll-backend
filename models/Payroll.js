@@ -1,6 +1,7 @@
 const db = require('../config/db');
 const EmployeeLoan = require('./EmployeeLoan');
 const EmployeeVacation = require('./EmployeeVacation');
+const PublicHoliday = require('./PublicHoliday');
 
 /**
  * @class Payroll
@@ -155,6 +156,35 @@ class Payroll {
             });
           }
           
+          // Get paid public holidays for this employee during this period
+          let holidayData = {
+            holidayHours: 0,
+            holidayPay: 0,
+            holidays: []
+          };
+          
+          try {
+            holidayData = await this.calculateHolidayPayForPeriod(
+              employeeDbId,
+              period.period_start,
+              period.period_end,
+              employeeData
+            );
+            
+            if (holidayData.holidayHours > 0) {
+              console.log(`Found ${holidayData.holidayHours} holiday hours for ${employeeData.first_name} ${employeeData.last_name}`);
+              console.log(`Holiday pay: $${holidayData.holidayPay}`);
+              console.log(`Holidays: ${holidayData.holidays.map(h => h.name).join(', ')}`);
+            }
+          } catch (holidayError) {
+            console.error(`Error retrieving holiday data for employee ${employeeDbId}:`, holidayError);
+            errors.push({
+              employeeId: employeeDbId,
+              employeeName: `${employeeData.first_name} ${employeeData.last_name}`,
+              error: `Failed to process holiday data: ${holidayError.message}`
+            });
+          }
+          
           // Initialize payroll item data
           let grossPay = 0;
           let payType = 'unknown';
@@ -182,8 +212,17 @@ class Payroll {
                 console.log(`Salaried employee vacation: ${vacationData.vacationHours} hours (included in salary)`);
               }
               
+              // For salaried employees, holiday pay is extra (added to salary)
+              grossPay += holidayData.holidayPay;
+              
+              // Log holiday hours if any
+              if (holidayData.holidayHours > 0) {
+                console.log(`Salaried employee holidays: ${holidayData.holidayHours} hours with pay $${holidayData.holidayPay}`);
+                console.log(`New total with holiday pay: $${grossPay}`);
+              }
+              
               payType = 'salary';
-              console.log(`Calculated salary pay: Base ${employeeData.salary}, Overtime 0, Total ${grossPay}`);
+              console.log(`Calculated salary pay: Base ${employeeData.salary}, Holiday Pay ${holidayData.holidayPay}, Total ${grossPay}`);
               break;
               
             case 'private_duty_nurse':
@@ -255,14 +294,19 @@ class Payroll {
                 console.log(`Private duty nurse pay for ${date.toLocaleDateString()}: ${day.totalHours} hours at $${rate}/hr = $${dailyPay}`);
               }
               
-              // Add vacation pay for private duty nurses
-              grossPay = totalNursePay + vacationData.vacationPay;
+              // Add vacation and holiday pay for private duty nurses
+              grossPay = totalNursePay + vacationData.vacationPay + holidayData.holidayPay;
               payType = 'private_duty_nurse';
               
               if (vacationData.vacationHours > 0) {
                 console.log(`Private duty nurse vacation pay: ${vacationData.vacationHours} hours = $${vacationData.vacationPay}`);
-                console.log(`Total nurse pay including vacation: $${grossPay}`);
               }
+              
+              if (holidayData.holidayHours > 0) {
+                console.log(`Private duty nurse holiday pay: ${holidayData.holidayHours} hours = $${holidayData.holidayPay}`);
+              }
+              
+              console.log(`Total nurse pay including vacation and holidays: $${grossPay}`);
               break;
               
             case 'hourly':
@@ -296,15 +340,16 @@ class Payroll {
               const regularPay = regularHours * hourlyRate;
               const overtimePay = overtimeHours * hourlyRate * 1.5; // Overtime at 1.5x
               
-              // Add vacation pay for hourly employees
-              grossPay = regularPay + overtimePay + vacationData.vacationPay;
+              // Add vacation and holiday pay for hourly employees
+              grossPay = regularPay + overtimePay + vacationData.vacationPay + holidayData.holidayPay;
               payType = 'hourly';
               
               console.log(`Using hourly rate: ${hourlyRate} for calculation`);
               console.log(`Regular hours: ${regularHours} at ${hourlyRate}/hr = ${regularPay}`);
               console.log(`Overtime hours: ${overtimeHours} at ${hourlyRate * 1.5}/hr = ${overtimePay}`);
               console.log(`Vacation hours: ${vacationData.vacationHours} with pay = ${vacationData.vacationPay}`);
-              console.log(`Total hourly pay: ${grossPay} (regular + overtime + vacation)`);
+              console.log(`Holiday hours: ${holidayData.holidayHours} with pay = ${holidayData.holidayPay}`);
+              console.log(`Total hourly pay: ${grossPay} (regular + overtime + vacation + holiday)`);
               break;
           }
           
@@ -355,11 +400,11 @@ class Payroll {
             `INSERT INTO payroll_items (
               payroll_run_id, employee_id, employee_name, employee_type,
               hours_worked, regular_hours, overtime_hours, overtime_amount, 
-              vacation_hours, vacation_amount, gross_pay,
+              vacation_hours, vacation_amount, holiday_hours, holiday_amount, gross_pay,
               social_security_employee, social_security_employer,
               medical_benefits_employee, medical_benefits_employer,
               education_levy, net_pay
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [
               payrollRunId,
               employeeDbId,
@@ -371,6 +416,8 @@ class Payroll {
               overtimeAmount,
               vacationHours,
               vacationAmount,
+              holidayData.holidayHours || 0,
+              holidayData.holidayPay || 0,
               grossPay,
               deductions.socialSecurityEmployee,
               deductions.socialSecurityEmployer,
@@ -790,6 +837,82 @@ class Payroll {
   }
 
   /**
+   * Calculate holiday pay for an employee within a period
+   * @param {string} employeeId - Employee ID
+   * @param {Date} startDate - Period start date
+   * @param {Date} endDate - Period end date
+   * @param {Object} employeeData - Employee data
+   * @returns {Promise<Object>} Holiday hours and pay
+   */
+  static async calculateHolidayPayForPeriod(employeeId, startDate, endDate, employeeData) {
+    try {
+      // Check if holiday pay is enabled
+      const holidayPayEnabled = await PublicHoliday.isHolidayPayEnabled();
+      
+      if (!holidayPayEnabled) {
+        return { holidayHours: 0, holidayPay: 0, holidays: [] };
+      }
+      
+      // Get holidays within the period
+      const holidays = await PublicHoliday.getHolidaysInRange(startDate, endDate);
+      
+      if (holidays.length === 0) {
+        return { holidayHours: 0, holidayPay: 0, holidays: [] };
+      }
+      
+      // Calculate standard daily hours based on employee type and payment frequency
+      let standardDailyHours = 8; // Default to 8 hours per day
+      
+      // For hourly employees, use standard hours / 5 (weekdays)
+      if (employeeData.employee_type === 'hourly' || employeeData.employee_type === 'private_duty_nurse') {
+        standardDailyHours = (employeeData.standard_hours || 40) / 5;
+      } else if (employeeData.employee_type === 'salary') {
+        // For salaried employees, use 8 hours per day (standard)
+        standardDailyHours = 8;
+      }
+      
+      // Calculate hourly rate for this employee
+      let hourlyRate;
+      
+      if (employeeData.employee_type === 'salary') {
+        // For salaried employees, calculate hourly rate based on monthly salary
+        const monthlySalary = employeeData.salary_amount !== undefined ? 
+                              employeeData.salary_amount : 
+                              (employeeData.salary !== undefined ? employeeData.salary : 0);
+        
+        // Monthly salary / (52 weeks * 40 hours / 12 months)
+        hourlyRate = (monthlySalary * 12) / (52 * 40);
+      } else if (employeeData.employee_type === 'private_duty_nurse') {
+        // For private duty nurses, use the day weekday rate as base rate for holidays
+        hourlyRate = 35.00; // Default rate, should be overridden by settings
+      } else {
+        // For hourly employees, use their standard rate
+        hourlyRate = employeeData.hourly_rate !== undefined ? 
+                     employeeData.hourly_rate : 
+                     (employeeData.rate !== undefined ? employeeData.rate : 0);
+      }
+      
+      // Calculate holiday hours and pay
+      let totalHolidayHours = 0;
+      let totalHolidayPay = 0;
+      
+      for (const holiday of holidays) {
+        totalHolidayHours += standardDailyHours;
+        totalHolidayPay += standardDailyHours * hourlyRate;
+      }
+      
+      return {
+        holidayHours: totalHolidayHours,
+        holidayPay: totalHolidayPay,
+        holidays
+      };
+    } catch (error) {
+      console.error('Error calculating holiday pay:', error);
+      return { holidayHours: 0, holidayPay: 0, holidays: [], error: error.message };
+    }
+  }
+  
+  /**
    * Calculate Year-To-Date totals for an employee up to a specific date
    * @param {string} employeeId - Employee ID
    * @param {Date} upToDate - Calculate YTD up to this date
@@ -812,7 +935,9 @@ class Payroll {
           SUM(net_pay) as ytd_net_pay,
           SUM(hours_worked) as ytd_hours_worked,
           SUM(vacation_hours) as ytd_vacation_hours,
-          SUM(vacation_amount) as ytd_vacation_amount
+          SUM(vacation_amount) as ytd_vacation_amount,
+          SUM(holiday_hours) as ytd_holiday_hours,
+          SUM(holiday_amount) as ytd_holiday_amount
         FROM payroll_items pi
         JOIN payroll_runs pr ON pi.payroll_run_id = pr.id
         WHERE pi.employee_id = ? 
@@ -835,7 +960,9 @@ class Payroll {
         ytd_net_pay: parseFloat(result.ytd_net_pay || 0),
         ytd_hours_worked: parseFloat(result.ytd_hours_worked || 0),
         ytd_vacation_hours: parseFloat(result.ytd_vacation_hours || 0),
-        ytd_vacation_amount: parseFloat(result.ytd_vacation_amount || 0)
+        ytd_vacation_amount: parseFloat(result.ytd_vacation_amount || 0),
+        ytd_holiday_hours: parseFloat(result.ytd_holiday_hours || 0),
+        ytd_holiday_amount: parseFloat(result.ytd_holiday_amount || 0)
       };
     } catch (error) {
       throw error;
@@ -856,8 +983,9 @@ class Payroll {
         (employee_id, year, ytd_gross_pay, ytd_social_security_employee, 
          ytd_social_security_employer, ytd_medical_benefits_employee, 
          ytd_medical_benefits_employer, ytd_education_levy, 
-         ytd_net_pay, ytd_hours_worked, ytd_vacation_hours, ytd_vacation_amount) 
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         ytd_net_pay, ytd_hours_worked, ytd_vacation_hours, ytd_vacation_amount,
+         ytd_holiday_hours, ytd_holiday_amount) 
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON DUPLICATE KEY UPDATE 
         ytd_gross_pay = VALUES(ytd_gross_pay),
         ytd_social_security_employee = VALUES(ytd_social_security_employee),
@@ -868,7 +996,9 @@ class Payroll {
         ytd_net_pay = VALUES(ytd_net_pay),
         ytd_hours_worked = VALUES(ytd_hours_worked),
         ytd_vacation_hours = VALUES(ytd_vacation_hours),
-        ytd_vacation_amount = VALUES(ytd_vacation_amount)`,
+        ytd_vacation_amount = VALUES(ytd_vacation_amount),
+        ytd_holiday_hours = VALUES(ytd_holiday_hours),
+        ytd_holiday_amount = VALUES(ytd_holiday_amount)`,
         [
           employeeId, year,
           ytdData.ytd_gross_pay,
@@ -880,7 +1010,9 @@ class Payroll {
           ytdData.ytd_net_pay,
           ytdData.ytd_hours_worked,
           ytdData.ytd_vacation_hours,
-          ytdData.ytd_vacation_amount
+          ytdData.ytd_vacation_amount,
+          ytdData.ytd_holiday_hours || 0,
+          ytdData.ytd_holiday_amount || 0
         ]
       );
     } catch (error) {

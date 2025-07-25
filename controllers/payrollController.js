@@ -623,7 +623,10 @@ exports.emailPaystubs = async (req, res) => {
     // Filter payroll items if not sending to all
     const payrollItems = sendToAll 
       ? payrollRun.items 
-      : payrollRun.items.filter(item => employeeIds.includes(item.employee_id));
+      : payrollRun.items.filter(item => 
+          employeeIds.includes(item.employee_id) || 
+          employeeIds.includes(item.employee_id?.toString())
+        );
     
     if (payrollItems.length === 0) {
       return res.status(400).json(formatError({
@@ -637,7 +640,7 @@ exports.emailPaystubs = async (req, res) => {
     for (const item of payrollItems) {
       if (item.employee_id) {
         const [employees] = await db.query(
-          `SELECT e.id, e.first_name, e.last_name, u.email 
+          `SELECT e.id, e.first_name, e.last_name, u.email, e.employee_type, e.hourly_rate, e.salary_amount, e.standard_hours
            FROM employees e
            LEFT JOIN users u ON e.user_id = u.id
            WHERE e.id = ?`,
@@ -649,7 +652,8 @@ exports.emailPaystubs = async (req, res) => {
             id: item.employee_id,
             name: `${employees[0].first_name} ${employees[0].last_name}`,
             email: employees[0].email,
-            payrollItem: item
+            payrollItem: item,
+            employeeDetails: employees[0]
           });
         }
       }
@@ -661,16 +665,26 @@ exports.emailPaystubs = async (req, res) => {
       }));
     }
     
-    // Setup email transporter
     const transporter = nodemailer.createTransport({
       host: process.env.EMAIL_HOST,
-      port: parseInt(process.env.EMAIL_PORT, 10),
-      secure: process.env.EMAIL_SECURE === 'true',
+      port: Number(process.env.EMAIL_PORT), // 465
+      secure: true, // true for 465, false for 587
       auth: {
         user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASSWORD
-      }
+        pass: process.env.EMAIL_PASSWORD,
+      },
     });
+
+    
+    // Get payroll settings for PDF generation
+    const [payrollSettings] = await db.query('SELECT * FROM payroll_settings LIMIT 1');
+    
+    // Prepare period data for PDF
+    const periodData = {
+      periodStart: payrollRun.period_start ? new Date(payrollRun.period_start).toLocaleDateString() : 'N/A',
+      periodEnd: payrollRun.period_end ? new Date(payrollRun.period_end).toLocaleDateString() : 'N/A',
+      payDate: payrollRun.pay_date ? new Date(payrollRun.pay_date).toLocaleDateString() : new Date().toLocaleDateString()
+    };
     
     // Prepare and send emails
     const emailResults = [];
@@ -704,10 +718,10 @@ exports.emailPaystubs = async (req, res) => {
           <div class="container">
             <div class="header">
               <h1>Your Paystub</h1>
-              <p>Pay Period: <%= payPeriod %></p>
+              <p>Pay Period: <%= periodStart %> to <%= periodEnd %></p>
             </div>
             <div class="content">
-              <p>Dear <%= name %>,</p>
+              <p>Dear <%= employeeName %>,</p>
               <p>Please find attached your paystub for the current pay period.</p>
               <h2>Payroll Summary</h2>
               <table>
@@ -725,11 +739,11 @@ exports.emailPaystubs = async (req, res) => {
                 </tr>
                 <tr>
                   <td>Social Security (7%)</td>
-                  <td>$<%= socialSecurity.toFixed(2) %></td>
+                  <td>$<%= socialSecurityEmployee.toFixed(2) %></td>
                 </tr>
                 <tr>
                   <td>Medical Benefits</td>
-                  <td>$<%= medicalBenefits.toFixed(2) %></td>
+                  <td>$<%= medicalBenefitsEmployee.toFixed(2) %></td>
                 </tr>
                 <tr>
                   <td>Education Levy</td>
@@ -754,25 +768,81 @@ exports.emailPaystubs = async (req, res) => {
     
     for (const employee of employeeEmails) {
       try {
-        const emailContent = await ejs.renderFile(emailTemplate, {
-          name: employee.name,
-          employeeName: employee.name,
-          periodStart: payrollRun.period_start,
-          periodEnd: payrollRun.period_end,
-          payDate: payrollRun.pay_date,
-          hoursWorked: employee.payrollItem.hours_worked,
-          grossPay: employee.payrollItem.gross_pay,
-          socialSecurity: employee.payrollItem.social_security_employee,
-          medicalBenefits: employee.payrollItem.medical_benefits_employee,
-          educationLevy: employee.payrollItem.education_levy,
-          netPay: employee.payrollItem.net_pay
+        // Generate PDF for attachment
+        let loanDetails = [];
+        
+        // Get loan details if there's a loan deduction
+        if (employee.payrollItem.loan_deduction && parseFloat(employee.payrollItem.loan_deduction) > 0) {
+          // Get loan payment details for this payroll item
+          const [loanPayments] = await db.query(`
+            SELECT 
+              lp.*, 
+              el.expected_end_date,
+              el.loan_type,
+              el.third_party_name,
+              el.third_party_reference
+            FROM 
+              loan_payments lp
+            JOIN 
+              employee_loans el ON lp.loan_id = el.id
+            WHERE 
+              lp.payroll_item_id = ?
+          `, [employee.payrollItem.id]);
+          
+          if (loanPayments && loanPayments.length > 0) {
+            loanDetails = loanPayments.map(payment => ({
+              loanId: payment.loan_id,
+              paymentAmount: payment.payment_amount,
+              remainingBalance: payment.remaining_balance,
+              expectedEndDate: payment.expected_end_date ? new Date(payment.expected_end_date).toLocaleDateString() : null,
+              loan_type: payment.loan_type || 'internal',
+              third_party_name: payment.third_party_name,
+              third_party_reference: payment.third_party_reference
+            }));
+          }
+        }
+        
+        // Generate PDF with employee details
+        const pdfBuffer = await generatePaystubPDF(employee.payrollItem, periodData, { 
+          employeeDetails: employee.employeeDetails,
+          loanDetails,
+          payrollSettings: payrollSettings[0] || {}
         });
         
+        const fileName = `paystub-${employee.name.replace(/\s+/g, '-')}-${payrollRun.period_start}-${payrollRun.period_end}.pdf`;
+        
+        // Render email template
+        const emailContent = await ejs.renderFile(emailTemplate, {
+          employeeName: employee.name,
+          periodStart: periodData.periodStart,
+          periodEnd: periodData.periodEnd,
+          payDate: periodData.payDate,
+          hoursWorked: employee.payrollItem.hours_worked || 0,
+          grossPay: parseFloat(employee.payrollItem.gross_pay) || 0,
+          socialSecurityEmployee: parseFloat(employee.payrollItem.social_security_employee) || 0,
+          medicalBenefitsEmployee: parseFloat(employee.payrollItem.medical_benefits_employee) || 0,
+          educationLevy: parseFloat(employee.payrollItem.education_levy) || 0,
+          netPay: parseFloat(employee.payrollItem.net_pay) || 0,
+          ytdGrossPay: parseFloat(employee.payrollItem.ytd_gross_pay) || 0,
+          ytdSocialSecurityEmployee: parseFloat(employee.payrollItem.ytd_social_security_employee) || 0,
+          ytdMedicalBenefitsEmployee: parseFloat(employee.payrollItem.ytd_medical_benefits_employee) || 0,
+          ytdEducationLevy: parseFloat(employee.payrollItem.ytd_education_levy) || 0,
+          ytdNetPay: parseFloat(employee.payrollItem.ytd_net_pay) || 0
+        });
+        
+        // Send email with PDF attachment
         const info = await transporter.sendMail({
-          from: `"Payroll System" <${process.env.EMAIL_FROM || process.env.EMAIL_USER}>`,
+          from: `"MSA Payroll System" <${process.env.EMAIL_FROM || process.env.EMAIL_USER}>`,
           to: employee.email,
-          subject: `Your Paystub for ${payrollRun.period_start} to ${payrollRun.period_end}`,
-          html: emailContent
+          subject: `Your Paystub for ${periodData.periodStart} to ${periodData.periodEnd}`,
+          html: emailContent,
+          attachments: [
+            {
+              filename: fileName,
+              content: pdfBuffer,
+              contentType: 'application/pdf'
+            }
+          ]
         });
         
         emailResults.push({

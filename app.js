@@ -11,6 +11,7 @@ const employeeRoutes = require('./routes/employeeRoutes');
 const payrollRoutes = require('./routes/payrollRoutes'); 
 const loanRoutes = require('./routes/loanRoutes');
 const vacationRoutes = require('./routes/vacationRoutes');
+const holidayRoutes = require('./routes/holidayRoutes');
 
 // Load environment variables
 dotenv.config();
@@ -34,6 +35,7 @@ app.use('/api/employees', employeeRoutes);
 app.use('/api/loans', loanRoutes);
 app.use('/api/payroll', payrollRoutes);
 app.use('/api/vacations', vacationRoutes);
+app.use('/api/holidays', holidayRoutes);
 
 // Health check route
 app.get('/api/health', (req, res) => {

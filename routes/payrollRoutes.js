@@ -34,8 +34,25 @@ router.get('/reports', getPayrollReports);
 router.get('/reports/:id', getPayrollReport);
 
 // Paystub routes
+// Download a paystub for a specific employee
 router.get('/paystub/:payrollRunId/:employeeId', downloadPaystub);
+
+// Email paystubs - supports two options via request body:
+// 1. Send to all employees: { payrollRunId: "123", sendToAll: true }
+// 2. Send to specific employees: { payrollRunId: "123", sendToAll: false, employeeIds: ["1", "2", "3"] }
 router.post('/email-paystubs', emailPaystubs);
+
+// Convenience route to email a paystub to a single employee
+router.post('/email-paystub/:payrollRunId/:employeeId', async (req, res) => {
+  // Set up the request body for a single employee
+  req.body = {
+    payrollRunId: req.params.payrollRunId,
+    sendToAll: false,
+    employeeIds: [req.params.employeeId]
+  };
+  // Call the main emailPaystubs function
+  return await emailPaystubs(req, res);
+});
 
 // Settings routes
 router.get('/settings', getPayrollSettings);

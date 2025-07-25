@@ -11,7 +11,10 @@ Phase 2 has been implemented with the following features:
   - Medical Benefits (3.5% standard rate, reduced rates for seniors)
   - Education Levy (tiered rates based on salary thresholds)
 - PDF paystub generation
-- Email delivery of paystubs to employees
+- Email delivery of paystubs to employees:
+  - Bulk email delivery for entire payroll run
+  - Individual email delivery for specific employees
+  - PDF paystubs attached to emails
 
 ## Latest Updates
 
@@ -102,7 +105,8 @@ A Postman collection is included at the root of the project (`Payroll_System_API
 | GET | `/api/payroll/reports` | Get all payroll reports |
 | GET | `/api/payroll/reports/:id` | Get payroll report details |
 | GET | `/api/payroll/paystub/:payrollRunId/:employeeId` | Download employee paystub PDF |
-| POST | `/api/payroll/email-paystubs` | Email paystubs to employees |
+| POST | `/api/payroll/email-paystubs` | Email paystubs to employees (bulk or selected) |
+| POST | `/api/payroll/email-paystub/:payrollRunId/:employeeId` | Email paystub to a specific employee |
 | GET | `/api/payroll/settings` | Get payroll settings |
 | PUT | `/api/payroll/settings` | Update payroll settings |
 
