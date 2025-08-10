@@ -1019,6 +1019,134 @@ class Payroll {
       throw error;
     }
   }
+
+  /**
+   * Generate a management-focused deductions report showing employee contributions
+   * @param {Object} options - Report options
+   * @param {string} options.filterType - Filter type: 'all', 'range', or 'dept'
+   * @param {Date} options.startDate - Start date for range filter
+   * @param {Date} options.endDate - End date for range filter
+   * @param {number} options.departmentId - Department ID for dept filter
+   * @param {boolean} options.includeInactive - Whether to include inactive employees
+   * @returns {Promise<Array>} Report data
+   */
+  static async generateDeductionsReport(options) {
+    try {
+      const { 
+        filterType = 'all', 
+        startDate, 
+        endDate, 
+        departmentId,
+        includeInactive = false
+      } = options;
+      
+      let query = `
+        SELECT 
+          e.id AS employee_id,
+          e.first_name,
+          e.last_name,
+          CONCAT(e.first_name, ' ', e.last_name) AS name,
+          d.name AS department,
+          SUM(pi.gross_pay) AS gross_pay,
+          SUM(pi.net_pay) AS net_pay,
+          SUM(pi.social_security_employee) AS ss_employee,
+          SUM(pi.social_security_employer) AS ss_employer,
+          SUM(pi.medical_benefits_employee) AS mb_employee,
+          SUM(pi.medical_benefits_employer) AS mb_employer,
+          SUM(pi.education_levy) AS el_employee,
+          0 AS el_employer
+        FROM 
+          employees e
+        LEFT JOIN 
+          departments d ON e.department_id = d.id
+        LEFT JOIN 
+          payroll_items pi ON e.id = pi.employee_id
+        LEFT JOIN 
+          payroll_runs pr ON pi.payroll_run_id = pr.id
+        WHERE 
+          pr.status IN ('completed', 'completed_with_errors', 'finalized')
+      `;
+
+      const queryParams = [];
+      
+      // Apply filters based on filterType
+      if (filterType === 'range' && startDate && endDate) {
+        query += ` AND pr.pay_date BETWEEN ? AND ?`;
+        queryParams.push(startDate, endDate);
+      } else if (filterType === 'dept' && departmentId) {
+        query += ` AND e.department_id = ?`;
+        queryParams.push(departmentId);
+      }
+      
+      // Filter out inactive employees if specified
+      if (!includeInactive) {
+        query += ` AND e.status = 'active'`;
+      }
+      
+      // Group by employee
+      query += `
+        GROUP BY 
+          e.id, e.first_name, e.last_name, d.name
+        ORDER BY 
+          e.last_name, e.first_name
+      `;
+      
+      const [rows] = await db.query(query, queryParams);
+      
+      // Calculate totals
+      const totals = rows.reduce((acc, row) => {
+        acc.gross_pay += parseFloat(row.gross_pay || 0);
+        acc.net_pay += parseFloat(row.net_pay || 0);
+        acc.ss_employee += parseFloat(row.ss_employee || 0);
+        acc.ss_employer += parseFloat(row.ss_employer || 0);
+        acc.mb_employee += parseFloat(row.mb_employee || 0);
+        acc.mb_employer += parseFloat(row.mb_employer || 0);
+        acc.el_employee += parseFloat(row.el_employee || 0);
+        acc.el_employer += parseFloat(row.el_employer || 0);
+        return acc;
+      }, { 
+        gross_pay: 0, 
+        net_pay: 0, 
+        ss_employee: 0, 
+        ss_employer: 0, 
+        mb_employee: 0, 
+        mb_employer: 0, 
+        el_employee: 0, 
+        el_employer: 0 
+      });
+      
+      // Format the rows for consistency
+      const formattedRows = rows.map(row => ({
+        employee_id: row.employee_id,
+        name: row.name,
+        department: row.department || 'Unassigned',
+        gross_pay: parseFloat(row.gross_pay || 0).toFixed(1),
+        net_pay: parseFloat(row.net_pay || 0).toFixed(1),
+        ss_employee: parseFloat(row.ss_employee || 0).toFixed(1),
+        ss_employer: parseFloat(row.ss_employer || 0).toFixed(1),
+        mb_employee: parseFloat(row.mb_employee || 0).toFixed(1),
+        mb_employer: parseFloat(row.mb_employer || 0).toFixed(1),
+        el_employee: parseFloat(row.el_employee || 0).toFixed(1),
+        el_employer: parseFloat(row.el_employer || 0).toFixed(1)
+      }));
+      
+      return {
+        rows: formattedRows,
+        totals: {
+          gross_pay: totals.gross_pay.toFixed(1),
+          net_pay: totals.net_pay.toFixed(1),
+          ss_employee: totals.ss_employee.toFixed(1),
+          ss_employer: totals.ss_employer.toFixed(1),
+          mb_employee: totals.mb_employee.toFixed(1),
+          mb_employer: totals.mb_employer.toFixed(1),
+          el_employee: totals.el_employee.toFixed(1),
+          el_employer: totals.el_employer.toFixed(1)
+        }
+      };
+    } catch (error) {
+      throw error;
+    }
+  }
 }
 
 module.exports = Payroll;

@@ -243,4 +243,35 @@ We've implemented comprehensive email delivery functionality for paystubs with t
 
 These enhancements complete the email delivery functionality requested in Phase 2, providing a reliable mechanism for distributing paystubs to employees automatically after payroll processing.
 
+## Recent Updates (August 10, 2025)
+
+### Management-Focused Deductions Report
+
+We've implemented a comprehensive management-focused deductions report as requested, with the following features:
+
+1. **Detailed Contribution Breakdown**:
+   - Shows employee and employer contributions for Social Security
+   - Shows employee and employer contributions for Medical Benefits
+   - Shows Education Levy contributions (employee-only)
+   - Displays gross pay and net pay for context
+
+2. **Flexible Filtering Options**:
+   - Filter by "all" employees for company-wide overview
+   - Filter by date "range" for period-specific analysis
+   - Filter by "department" for departmental analysis
+   - Option to include or exclude inactive employees
+
+3. **Multiple Output Formats**:
+   - JSON format for application integration
+   - CSV format for Excel analysis and reporting
+   - Totals calculation for all columns
+
+4. **Technical Implementation**:
+   - New API endpoint: `/api/payroll/deductions-report`
+   - Support for query parameters to control filtering
+   - Efficient database queries for performance
+   - Proper totaling and formatting of monetary values
+
+This report fulfills the requirement for enhanced management reporting and will provide valuable insights for financial analysis and decision-making.
+
 Please review this proposal and let me know if you need any clarification or have additional requirements to discuss.

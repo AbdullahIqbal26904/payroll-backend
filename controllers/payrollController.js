@@ -601,6 +601,73 @@ exports.updatePayrollSettings = async (req, res) => {
  * @route   POST /api/payroll/email-paystubs
  * @access  Private/Admin
  */
+/**
+ * @desc    Get management-focused deductions report
+ * @route   GET /api/payroll/deductions-report
+ * @access  Private/Admin
+ */
+exports.getDeductionsReport = async (req, res) => {
+  try {
+    const {
+      filterType = 'all',
+      startDate,
+      endDate,
+      departmentId,
+      includeInactive = false,
+      format = 'csv'
+    } = req.query;
+
+    // Validate filter parameters
+    if (filterType === 'range' && (!startDate || !endDate)) {
+      return res.status(400).json(formatError({
+        message: 'Start date and end date are required for range filter'
+      }));
+    }
+
+    if (filterType === 'dept' && !departmentId) {
+      return res.status(400).json(formatError({
+        message: 'Department ID is required for department filter'
+      }));
+    }
+
+    // Get the report data from the Payroll model
+    const reportData = await Payroll.generateDeductionsReport({
+      filterType,
+      startDate: startDate ? new Date(startDate) : undefined,
+      endDate: endDate ? new Date(endDate) : undefined,
+      departmentId: departmentId ? parseInt(departmentId, 10) : undefined,
+      includeInactive: includeInactive === 'true'
+    });
+
+    // If CSV format is requested, convert the data to CSV
+    if (format === 'csv') {
+      // Create CSV content
+      let csvContent = 'Employee ID,Name,Gross Pay,Net Pay,SS (EE),SS (ER),MB (EE),MB (ER),EL (EE),EL (ER)\n';
+      
+      // Add data rows
+      reportData.rows.forEach(row => {
+        csvContent += `${row.employee_id},${row.name},${row.gross_pay},${row.net_pay},${row.ss_employee},${row.ss_employer},${row.mb_employee},${row.mb_employer},${row.el_employee},${row.el_employer}\n`;
+      });
+      
+      // Add totals row
+      csvContent += `,,${reportData.totals.gross_pay},${reportData.totals.net_pay},${reportData.totals.ss_employee},${reportData.totals.ss_employer},${reportData.totals.mb_employee},${reportData.totals.mb_employer},${reportData.totals.el_employee},${reportData.totals.el_employer}\n`;
+      
+      // Set headers for file download
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', `attachment; filename=deductions-report-${new Date().toISOString().split('T')[0]}.csv`);
+      
+      // Send CSV response
+      return res.send(csvContent);
+    }
+
+    // Return JSON response by default
+    return res.status(200).json(formatSuccess('Deductions report generated successfully', reportData));
+  } catch (error) {
+    console.error('Error generating deductions report:', error);
+    return res.status(500).json(formatError(error));
+  }
+};
+
 exports.emailPaystubs = async (req, res) => {
   try {
     const { payrollRunId, sendToAll = false, employeeIds = [] } = req.body;

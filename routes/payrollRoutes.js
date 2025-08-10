@@ -9,6 +9,7 @@ const {
   emailPaystubs,
   getPayrollSettings,
   updatePayrollSettings,
+  getDeductionsReport,
   upload
 } = require('../controllers/payrollController');
 const { uploadTimesheet } = require('../controllers/timesheetController');
@@ -32,6 +33,7 @@ router.post('/calculate', calculatePayroll);
 // Payroll reports routes
 router.get('/reports', getPayrollReports);
 router.get('/reports/:id', getPayrollReport);
+router.get('/deductions-report', getDeductionsReport);
 
 // Paystub routes
 // Download a paystub for a specific employee

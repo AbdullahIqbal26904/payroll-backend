@@ -18,6 +18,12 @@ Phase 2 has been implemented with the following features:
 
 ## Latest Updates
 
+- Added management-focused deductions report for analyzing employee contributions:
+  - Detailed breakdown of social security, medical benefits, and education levy contributions
+  - Filter by all employees, date range, or department
+  - Export in CSV format for further analysis
+  - View totals for gross pay, net pay, and all deduction types
+
 - Added support for Private Duty Nurse employee type:
   - Shift-based pay rates
   - Day shift (7am-7pm) Monday-Friday: $35/hour
@@ -109,6 +115,7 @@ A Postman collection is included at the root of the project (`Payroll_System_API
 | POST | `/api/payroll/email-paystub/:payrollRunId/:employeeId` | Email paystub to a specific employee |
 | GET | `/api/payroll/settings` | Get payroll settings |
 | PUT | `/api/payroll/settings` | Update payroll settings |
+| GET | `/api/payroll/deductions-report` | Get management-focused deductions report |
 
 <!-- Employee Loan Management section removed -->
 
