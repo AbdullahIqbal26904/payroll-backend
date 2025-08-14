@@ -6,6 +6,12 @@ exports.loginValidation = [
   check('password', 'Password is required').not().isEmpty()
 ];
 
+// Validation for MFA verification
+exports.mfaValidation = [
+  check('userId', 'User ID is required').not().isEmpty(),
+  check('token', 'MFA Token is required').not().isEmpty().isLength({ min: 6, max: 10 })
+];
+
 // Validation for user registration
 exports.userValidation = [
   check('name', 'Name is required').not().isEmpty(),

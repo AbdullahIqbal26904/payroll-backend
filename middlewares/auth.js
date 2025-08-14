@@ -27,7 +27,7 @@ exports.protect = async (req, res, next) => {
       
       // Get user from database
       const [rows] = await db.query(
-        'SELECT id, name, email, role FROM users WHERE id = ?',
+        'SELECT id, name, email, role, mfa_enabled FROM users WHERE id = ?',
         [decoded.id]
       );
       
@@ -40,6 +40,16 @@ exports.protect = async (req, res, next) => {
       
       // Add user to request
       req.user = rows[0];
+
+      // If this is not a temporary token and MFA is required but not verified
+      if (decoded.isMfaVerified === false && rows[0].mfa_enabled === 1) {
+        return res.status(401).json({
+          success: false,
+          message: 'MFA verification required',
+          requireMFA: true
+        });
+      }
+      
       next();
     } catch (error) {
       return res.status(401).json({

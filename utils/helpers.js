@@ -27,13 +27,14 @@ exports.formatDate = (date) => {
  * Generate JWT token
  * @param {number} id - User ID
  * @param {string} role - User role
+ * @param {string} [expiration] - Custom expiration time (overrides env setting)
  * @returns {string} JWT token
  */
-exports.generateToken = (id, role) => {
+exports.generateToken = (id, role, expiration = null) => {
   return jwt.sign(
     { id, role },
     process.env.JWT_SECRET,
-    { expiresIn: process.env.JWT_EXPIRE }
+    { expiresIn: expiration || process.env.JWT_EXPIRE }
   );
 };
 

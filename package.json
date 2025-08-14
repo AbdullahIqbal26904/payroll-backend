@@ -24,7 +24,9 @@
     "multer": "^2.0.1",
     "mysql2": "^3.14.1",
     "nodemailer": "^7.0.3",
-    "pdfkit": "^0.17.1"
+    "pdfkit": "^0.17.1",
+    "qrcode": "^1.5.4",
+    "speakeasy": "^2.0.0"
   },
   "devDependencies": {
     "nodemon": "^3.1.10"
