@@ -20,7 +20,7 @@ exports.addEmployee = async (req, res) => {
     hire_date, 
     job_title,
     employee_type, 
-    department, 
+    department_id,
     salary_amount, 
     hourly_rate,
     standard_hours,
@@ -39,6 +39,29 @@ exports.addEmployee = async (req, res) => {
       return res.status(400).json({
         success: false,
         message: 'Employee ID is required'
+      });
+    }
+    
+    // Validate department_id is provided
+    if (!department_id) {
+      await db.query('ROLLBACK');
+      return res.status(400).json({
+        success: false,
+        message: 'Department ID is required'
+      });
+    }
+    
+    // Verify if the department exists
+    const [existingDept] = await db.query(
+      'SELECT * FROM departments WHERE id = ?',
+      [department_id]
+    );
+    
+    if (existingDept.length === 0) {
+      await db.query('ROLLBACK');
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid department ID. Department does not exist'
       });
     }
     
@@ -100,9 +123,9 @@ exports.addEmployee = async (req, res) => {
   const [result] = await db.query(
     `INSERT INTO employees 
     (id, user_id, first_name, last_name, date_of_birth, gender, address, phone, email,
-      hire_date, job_title, employee_type, department, salary_amount, hourly_rate, standard_hours, payment_frequency, 
-      is_exempt_ss, is_exempt_medical, date_of_birth_for_age) 
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      hire_date, job_title, employee_type, department_id, salary_amount, hourly_rate, standard_hours, payment_frequency, 
+      is_exempt_ss, is_exempt_medical, date_of_birth_for_age, status) 
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       employee_id,
       userId, 
@@ -116,14 +139,15 @@ exports.addEmployee = async (req, res) => {
       hire_date, 
       job_title,
       employee_type,
-      department, 
+      department_id,
       salary_amount, 
       hourly_rate || 0.00,
       standard_hours || 40, // Adding default value for standard hours
       payment_frequency, 
       is_exempt_ss || false,
       is_exempt_medical || false,
-      dateOfBirthForAge
+      dateOfBirthForAge,
+      'active' // Default status
     ]
   );
     
@@ -158,27 +182,62 @@ exports.getEmployees = async (req, res) => {
     const sortBy = req.query.sortBy || 'id';
     const sortOrder = req.query.sortOrder === 'desc' ? 'DESC' : 'ASC';
     
-    // Build query with optional search filter
-    let query = 'SELECT * FROM employees';
-    let countQuery = 'SELECT COUNT(*) as total FROM employees';
+    // Build query with optional search filter and join with departments
+    let query = `
+      SELECT 
+        e.*,
+        d.name AS department_name,
+        d.code AS department_code
+      FROM 
+        employees e
+      LEFT JOIN 
+        departments d ON e.department_id = d.id
+    `;
+    
+    let countQuery = 'SELECT COUNT(*) as total FROM employees e';
     let queryParams = [];
     
     if (req.query.search) {
       const searchTerm = `%${req.query.search}%`;
-      query += ' WHERE id LIKE ? OR first_name LIKE ? OR last_name LIKE ? OR job_title LIKE ? OR department LIKE ?';
-      countQuery += ' WHERE id LIKE ? OR first_name LIKE ? OR last_name LIKE ? OR job_title LIKE ? OR department LIKE ?';
+      query += ` 
+        WHERE e.id LIKE ? 
+        OR e.first_name LIKE ? 
+        OR e.last_name LIKE ? 
+        OR e.job_title LIKE ?
+        OR d.name LIKE ?
+      `;
+      countQuery += ` 
+        LEFT JOIN departments d ON e.department_id = d.id
+        WHERE e.id LIKE ? 
+        OR e.first_name LIKE ? 
+        OR e.last_name LIKE ? 
+        OR e.job_title LIKE ?
+        OR d.name LIKE ?
+      `;
       queryParams = [searchTerm, searchTerm, searchTerm, searchTerm, searchTerm];
     }
     
+    // Add department filter if provided
+    if (req.query.department_id) {
+      const whereClause = req.query.search ? 'AND' : 'WHERE';
+      query += ` ${whereClause} e.department_id = ?`;
+      countQuery += ` ${whereClause} e.department_id = ?`;
+      queryParams.push(req.query.department_id);
+    }
+    
     // Add sorting and pagination
-    query += ` ORDER BY ${sortBy} ${sortOrder} LIMIT ? OFFSET ?`;
+    query += ` ORDER BY ${sortBy === 'department' ? 'd.name' : 'e.' + sortBy} ${sortOrder} LIMIT ? OFFSET ?`;
     queryParams.push(limit, offset);
     
     // Execute query
     const [employees] = await db.query(query, queryParams);
     
     // Get total count for pagination
-    const [countResult] = await db.query(countQuery, req.query.search ? queryParams.slice(0, 5) : []);
+    let countQueryParams = req.query.search ? queryParams.slice(0, 5) : [];
+    if (req.query.department_id) {
+      countQueryParams.push(req.query.department_id);
+    }
+    const [countResult] = await db.query(countQuery, countQueryParams);
     const total = countResult[0].total;
     
     const response = {
@@ -205,7 +264,16 @@ exports.getEmployees = async (req, res) => {
 exports.getEmployee = async (req, res) => {
   try {
     const [employee] = await db.query(
-      'SELECT * FROM employees WHERE id = ?',
+      `SELECT 
+        e.*,
+        d.name AS department_name,
+        d.code AS department_code
+      FROM 
+        employees e
+      LEFT JOIN 
+        departments d ON e.department_id = d.id
+      WHERE 
+        e.id = ?`,
       [req.params.id]
     );
     
@@ -256,7 +324,6 @@ exports.updateEmployee = async (req, res) => {
     hire_date, 
     job_title,
     employee_type,
-    department,
     department_id,
     salary_amount,
     hourly_rate,
@@ -345,7 +412,7 @@ exports.updateEmployee = async (req, res) => {
       `UPDATE employees 
        SET first_name = ?, last_name = ?, email = ?, date_of_birth = ?, gender = ?, 
            address = ?, phone = ?, hire_date = ?, job_title = ?, 
-           employee_type = ?, department = ?, department_id = ?, 
+           employee_type = ?, department_id = ?, 
            salary_amount = ?, hourly_rate = ?, standard_hours = ?,
            payment_frequency = ?, is_exempt_ss = ?, is_exempt_medical = ?,
            status = ?, date_of_birth_for_age = ?
@@ -361,7 +428,6 @@ exports.updateEmployee = async (req, res) => {
         hire_date || employee[0].hire_date, 
         job_title || employee[0].job_title,
         employee_type || employee[0].employee_type,
-        department || employee[0].department,
         department_id || employee[0].department_id,
         salary_amount !== undefined ? salary_amount : employee[0].salary_amount,
         hourly_rate !== undefined ? hourly_rate : employee[0].hourly_rate,

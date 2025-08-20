@@ -33,7 +33,7 @@ exports.employeeValidation = [
   check('date_of_birth', 'Date of birth must be a valid date').optional().isDate(),
   check('is_exempt_ss', 'Social Security exemption must be a boolean').optional().isBoolean(),
   check('is_exempt_medical', 'Medical benefits exemption must be a boolean').optional().isBoolean(),
-  check('department_id', 'Department ID must be a number').optional().isNumeric(),
+  check('department_id', 'Department ID is required').not().isEmpty().isNumeric(),
   check('status', 'Status must be active or inactive').optional().isIn(['active', 'inactive'])
 ];
 
@@ -62,6 +62,20 @@ exports.validateVacationEntry = [
   check('total_hours', 'Total hours must be a valid number').isNumeric(),
   check('hourly_rate', 'Hourly rate must be a valid number').optional().isNumeric(),
   check('status', 'Status must be pending, approved, or cancelled').optional().isIn(['pending', 'approved', 'cancelled'])
+];
+
+// Validation for department creation
+exports.departmentValidation = [
+  check('name', 'Department name is required').not().isEmpty(),
+  check('code', 'Department code must be a string').optional().isString(),
+  check('description', 'Description must be a string').optional().isString()
+];
+
+// Validation for department update
+exports.departmentUpdateValidation = [
+  check('name', 'Department name is required').not().isEmpty(),
+  check('code', 'Department code must be a string').optional().isString(),
+  check('description', 'Description must be a string').optional().isString()
 ];
 
 // Middleware to validate request
