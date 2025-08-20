@@ -42,10 +42,10 @@ async function up(db) {
   `);
 
   console.log('Updating payroll_items table to include loan_deduction column...');
-  // await db.query(`
-  //   ALTER TABLE payroll_items 
-  //   ADD COLUMN loan_deduction DECIMAL(10, 2) DEFAULT 0.00 AFTER education_levy;
-  // `);
+  await db.query(`
+    ALTER TABLE payroll_items 
+    ADD COLUMN loan_deduction DECIMAL(10, 2) DEFAULT 0.00 AFTER education_levy;
+  `);
 
   console.log('Migration complete!');
 }
