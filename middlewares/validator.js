@@ -28,10 +28,30 @@ exports.employeeValidation = [
   check('employee_type', 'Employee type must be salary, hourly, or private_duty_nurse').isIn(['salary', 'hourly', 'private_duty_nurse']),
   check('salary_amount', 'Salary must be a valid number').isNumeric(),
   check('hourly_rate', 'Hourly rate must be a valid number').optional().isNumeric(),
+  check('standard_hours', 'Standard hours must be a valid number').optional().isNumeric(),
   check('payment_frequency', 'Payment frequency must be Monthly, Bi-Weekly, or Semi-Monthly').isIn(['Monthly', 'Bi-Weekly', 'Semi-Monthly']),
   check('date_of_birth', 'Date of birth must be a valid date').optional().isDate(),
   check('is_exempt_ss', 'Social Security exemption must be a boolean').optional().isBoolean(),
-  check('is_exempt_medical', 'Medical benefits exemption must be a boolean').optional().isBoolean()
+  check('is_exempt_medical', 'Medical benefits exemption must be a boolean').optional().isBoolean(),
+  check('department_id', 'Department ID must be a number').optional().isNumeric(),
+  check('status', 'Status must be active or inactive').optional().isIn(['active', 'inactive'])
+];
+
+// Validation for employee update (less strict than creation)
+exports.employeeUpdateValidation = [
+  check('first_name', 'First name must be a string').optional().isString(),
+  check('last_name', 'Last name must be a string').optional().isString(),
+  check('email', 'Please include a valid email').optional().isEmail(),
+  check('employee_type', 'Employee type must be salary, hourly, or private_duty_nurse').optional().isIn(['salary', 'hourly', 'private_duty_nurse']),
+  check('salary_amount', 'Salary must be a valid number').optional().isNumeric(),
+  check('hourly_rate', 'Hourly rate must be a valid number').optional().isNumeric(),
+  check('standard_hours', 'Standard hours must be a valid number').optional().isNumeric(),
+  check('payment_frequency', 'Payment frequency must be Monthly, Bi-Weekly, or Semi-Monthly').optional().isIn(['Monthly', 'Bi-Weekly', 'Semi-Monthly']),
+  check('date_of_birth', 'Date of birth must be a valid date').optional().isDate(),
+  check('is_exempt_ss', 'Social Security exemption must be a boolean').optional().isBoolean(),
+  check('is_exempt_medical', 'Medical benefits exemption must be a boolean').optional().isBoolean(),
+  check('department_id', 'Department ID must be a number').optional().isNumeric(),
+  check('status', 'Status must be active or inactive').optional().isIn(['active', 'inactive'])
 ];
 
 // Validation for vacation entry

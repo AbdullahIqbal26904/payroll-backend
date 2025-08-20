@@ -248,18 +248,29 @@ exports.updateEmployee = async (req, res) => {
   const { 
     first_name, 
     last_name, 
+    email,
     date_of_birth, 
     gender, 
     address, 
     phone, 
     hire_date, 
-    job_title, 
-    department, 
-    salary_amount, 
-    payment_frequency 
+    job_title,
+    employee_type,
+    department,
+    department_id,
+    salary_amount,
+    hourly_rate,
+    standard_hours,
+    payment_frequency,
+    is_exempt_ss,
+    is_exempt_medical,
+    status
   } = req.body;
   
   try {
+    // Start transaction for data consistency
+    await db.query('START TRANSACTION');
+    
     // Check if employee exists
     const [employee] = await db.query(
       'SELECT * FROM employees WHERE id = ?',
@@ -267,6 +278,7 @@ exports.updateEmployee = async (req, res) => {
     );
     
     if (employee.length === 0) {
+      await db.query('ROLLBACK');
       return res.status(404).json({
         success: false,
         message: 'Employee not found'
@@ -282,30 +294,89 @@ exports.updateEmployee = async (req, res) => {
       dateOfBirthForAge = Math.abs(ageDate.getUTCFullYear() - 1970);
     }
     
+    // Handle email update if provided
+    if (email && email !== employee[0].email) {
+      // Check if email already exists in users table
+      const [existingUser] = await db.query(
+        'SELECT * FROM users WHERE email = ? AND id != ?',
+        [email, employee[0].user_id || 0]
+      );
+      
+      if (existingUser.length > 0) {
+        await db.query('ROLLBACK');
+        return res.status(400).json({
+          success: false,
+          message: 'A user with this email already exists'
+        });
+      }
+      
+      // Update the associated user if exists
+      if (employee[0].user_id) {
+        await db.query(
+          'UPDATE users SET email = ?, name = ? WHERE id = ?',
+          [email, `${first_name || employee[0].first_name} ${last_name || employee[0].last_name}`, employee[0].user_id]
+        );
+      } else if (email) {
+        // Create a new user account if email is being added and no user exists
+        const defaultPassword = `${(first_name || employee[0].first_name).toLowerCase()}${(last_name || employee[0].last_name).toLowerCase()}123`;
+        const salt = await bcrypt.genSalt(10);
+        const hashedPassword = await bcrypt.hash(defaultPassword, salt);
+        
+        const [userResult] = await db.query(
+          'INSERT INTO users (name, email, password, role) VALUES (?, ?, ?, ?)',
+          [
+            `${first_name || employee[0].first_name} ${last_name || employee[0].last_name}`, 
+            email, 
+            hashedPassword, 
+            'employee'
+          ]
+        );
+        
+        // Update employee with new user_id
+        await db.query(
+          'UPDATE employees SET user_id = ? WHERE id = ?',
+          [userResult.insertId, req.params.id]
+        );
+      }
+    }
+    
     // Update employee
     await db.query(
       `UPDATE employees 
-       SET first_name = ?, last_name = ?, date_of_birth = ?, gender = ?, 
+       SET first_name = ?, last_name = ?, email = ?, date_of_birth = ?, gender = ?, 
            address = ?, phone = ?, hire_date = ?, job_title = ?, 
-           department = ?, salary_amount = ?, payment_frequency = ?, 
-           date_of_birth_for_age = ?
+           employee_type = ?, department = ?, department_id = ?, 
+           salary_amount = ?, hourly_rate = ?, standard_hours = ?,
+           payment_frequency = ?, is_exempt_ss = ?, is_exempt_medical = ?,
+           status = ?, date_of_birth_for_age = ?
        WHERE id = ?`,
       [
-        first_name, 
-        last_name, 
-        date_of_birth, 
-        gender, 
-        address, 
-        phone, 
-        hire_date, 
-        job_title, 
-        department, 
-        salary_amount, 
-        payment_frequency, 
+        first_name || employee[0].first_name, 
+        last_name || employee[0].last_name, 
+        email || employee[0].email,
+        date_of_birth || employee[0].date_of_birth, 
+        gender || employee[0].gender, 
+        address || employee[0].address, 
+        phone || employee[0].phone, 
+        hire_date || employee[0].hire_date, 
+        job_title || employee[0].job_title,
+        employee_type || employee[0].employee_type,
+        department || employee[0].department,
+        department_id || employee[0].department_id,
+        salary_amount !== undefined ? salary_amount : employee[0].salary_amount,
+        hourly_rate !== undefined ? hourly_rate : employee[0].hourly_rate,
+        standard_hours !== undefined ? standard_hours : employee[0].standard_hours,
+        payment_frequency || employee[0].payment_frequency,
+        is_exempt_ss !== undefined ? is_exempt_ss : employee[0].is_exempt_ss,
+        is_exempt_medical !== undefined ? is_exempt_medical : employee[0].is_exempt_medical,
+        status || employee[0].status || 'active',
         dateOfBirthForAge,
         req.params.id
       ]
     );
+    
+    // Commit transaction
+    await db.query('COMMIT');
     
     // Get updated employee
     const [updatedEmployee] = await db.query(
@@ -313,8 +384,27 @@ exports.updateEmployee = async (req, res) => {
       [req.params.id]
     );
     
-    res.status(200).json(formatSuccess('Employee updated successfully', updatedEmployee[0]));
+    // Get associated user if exists
+    let userData = null;
+    if (updatedEmployee[0].user_id) {
+      const [user] = await db.query(
+        'SELECT id, name, email, role FROM users WHERE id = ?',
+        [updatedEmployee[0].user_id]
+      );
+      if (user.length > 0) {
+        userData = user[0];
+      }
+    }
+    
+    const employeeData = {
+      ...updatedEmployee[0],
+      user: userData
+    };
+    
+    res.status(200).json(formatSuccess('Employee updated successfully', employeeData));
   } catch (error) {
+    // Rollback transaction on error
+    await db.query('ROLLBACK');
     res.status(500).json(formatError(error));
   }
 };

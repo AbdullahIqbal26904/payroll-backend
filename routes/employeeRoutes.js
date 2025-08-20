@@ -8,7 +8,7 @@ const {
 } = require('../controllers/employeeController');
 const { getEmployeeLoans } = require('../controllers/loanController');
 const { protect, authorize, auditLogger } = require('../middlewares/auth');
-const { employeeValidation, validateRequest } = require('../middlewares/validator');
+const { employeeValidation, employeeUpdateValidation, validateRequest } = require('../middlewares/validator');
 
 const router = express.Router();
 
@@ -25,7 +25,7 @@ router
 router
   .route('/:id')
   .get(getEmployee)
-  .put(updateEmployee)
+  .put(employeeUpdateValidation, validateRequest, updateEmployee)
   .delete(deleteEmployee);
 
 // Route for getting employee loans
