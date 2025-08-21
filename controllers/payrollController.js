@@ -363,6 +363,37 @@ exports.getPayrollReport = async (req, res) => {
       }));
     }
     
+    // Add email information for each employee in the report
+    if (report.items && report.items.length > 0) {
+      // Get all employee IDs from the payroll items
+      const employeeIds = report.items
+        .filter(item => item.employee_id)
+        .map(item => item.employee_id);
+      
+      if (employeeIds.length > 0) {
+        // Get email information from the users table
+        const [employees] = await db.query(`
+          SELECT e.id, u.email
+          FROM employees e
+          LEFT JOIN users u ON e.user_id = u.id
+          WHERE e.id IN (${employeeIds.map(() => '?').join(',')})
+        `, employeeIds);
+        
+        // Create a map of employee_id to email
+        const emailMap = {};
+        for (const employee of employees) {
+          emailMap[employee.id] = employee.email;
+        }
+        
+        // Add email to each payroll item
+        for (const item of report.items) {
+          if (item.employee_id && emailMap[item.employee_id]) {
+            item.email = emailMap[item.employee_id];
+          }
+        }
+      }
+    }
+    
     return res.status(200).json(formatSuccess('Payroll report retrieved successfully', report));
   } catch (error) {
     console.error('Error retrieving payroll report:', error);
