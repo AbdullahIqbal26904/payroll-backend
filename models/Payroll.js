@@ -200,7 +200,36 @@ class Payroll {
               // Check if we have salary_amount or just salary in the employee data
               const salaryAmount = employeeData.salary_amount !== undefined ? employeeData.salary_amount : 
                                   (employeeData.salary !== undefined ? employeeData.salary : 0);
-              grossPay = salaryAmount / payPeriods;
+              
+              // Calculate base salary for the period
+              const baseSalaryForPeriod = salaryAmount / payPeriods;
+              
+              // Calculate standard hours for the period based on payment frequency
+              let standardHoursPerPeriod;
+              if (employeeData.payment_frequency === 'Weekly') {
+                standardHoursPerPeriod = 40; // 40 hours per week
+              } else if (employeeData.payment_frequency === 'Bi-Weekly') {
+                standardHoursPerPeriod = 80; // 80 hours per bi-weekly period
+              } else if (employeeData.payment_frequency === 'Semi-Monthly') {
+                standardHoursPerPeriod = 86.7; // ~86.7 hours per semi-monthly period (based on 4.33 weeks/month)
+              } else { // Monthly
+                standardHoursPerPeriod = 173.3; // ~173.3 hours per month (based on 4.33 weeks/month)
+              }
+              
+              // Get total worked hours (excluding vacation, which is already paid in salary)
+              const totalWorkedHours = employeeInfo.totalHours;
+              
+              // Prorate salary based on hours worked vs expected hours
+              // Only prorate if hours worked is less than standard hours
+              if (totalWorkedHours < standardHoursPerPeriod) {
+                const proratedFactor = totalWorkedHours / standardHoursPerPeriod;
+                grossPay = baseSalaryForPeriod * proratedFactor;
+                console.log(`Prorating salary: ${totalWorkedHours} hours worked out of ${standardHoursPerPeriod} standard hours`);
+                console.log(`Proration factor: ${proratedFactor.toFixed(4)}, Base salary: ${baseSalaryForPeriod}, Prorated salary: ${grossPay}`);
+              } else {
+                grossPay = baseSalaryForPeriod;
+                console.log(`No proration needed: ${totalWorkedHours} hours worked meets or exceeds ${standardHoursPerPeriod} standard hours`);
+              }
               
               // For salaried employees, vacation hours are counted as worked hours
               // but don't affect gross pay (already included in salary)
@@ -222,7 +251,7 @@ class Payroll {
               }
               
               payType = 'salary';
-              console.log(`Calculated salary pay: Base ${employeeData.salary}, Holiday Pay ${holidayData.holidayPay}, Total ${grossPay}`);
+              console.log(`Calculated salary pay: Base ${salaryAmount}, Holiday Pay ${holidayData.holidayPay}, Total ${grossPay}`);
               break;
               
             case 'private_duty_nurse':

@@ -451,6 +451,10 @@ const generatePaystubPDF = async (payrollItem, periodData, options = {}) => {
       const ytdHoursWorked = parseFloat(payrollItem.ytdHoursWorked || payrollItem.ytd_hours_worked || 0).toFixed(2);
       const ytdVacationHours = parseFloat(payrollItem.ytdVacationHours || payrollItem.ytd_vacation_hours || 0).toFixed(2);
       const ytdVacationAmount = parseFloat(payrollItem.ytdVacationAmount || payrollItem.ytd_vacation_amount || 0).toFixed(2);
+      const ytdHolidayHours = parseFloat(payrollItem.ytdHolidayHours || payrollItem.ytd_holiday_hours || 0).toFixed(2);
+      const ytdHolidayAmount = parseFloat(payrollItem.ytdHolidayAmount || payrollItem.ytd_holiday_amount || 0).toFixed(2);
+      const ytdSocialSecurityEmployer = parseFloat(payrollItem.ytdSocialSecurityEmployer || payrollItem.ytd_social_security_employer || 0).toFixed(2);
+      const ytdMedicalBenefitsEmployer = parseFloat(payrollItem.ytdMedicalBenefitsEmployer || payrollItem.ytd_medical_benefits_employer || 0).toFixed(2);
       
       // Calculate row height based on available space - more compact
       const ytdRowHeight = 16;
@@ -468,14 +472,14 @@ const generatePaystubPDF = async (payrollItem, periodData, options = {}) => {
       currentYtdY += ytdRowHeight;
       
       // Row 2: Deductions - compact
+      const ytdStatutoryDeductions = (parseFloat(ytdSocialSecurityEmployee) + parseFloat(ytdMedicalBenefitsEmployee) + parseFloat(ytdEducationLevy)).toFixed(2);
       doc.rect(leftTableX, currentYtdY, tableWidth, ytdRowHeight)
          .fillAndStroke(colors.lightGray, colors.border);
          
       doc.fillColor(colors.text).fontSize(8).font('Helvetica')
          .text('Total Deductions', leftTableX + 5, currentYtdY + 4, { width: ytdColWidth - 5, align: 'left' })
          .text(`$${totalDeductions.toFixed(2)}`, leftTableX + ytdColWidth, currentYtdY + 4, { width: ytdColWidth - 5, align: 'center' })
-         .text(`$${(parseFloat(ytdSocialSecurityEmployee) + parseFloat(ytdMedicalBenefitsEmployee) + parseFloat(ytdEducationLevy)).toFixed(2)}`, 
-                leftTableX + ytdColWidth * 2, currentYtdY + 4, { width: ytdColWidth - 5, align: 'right' });
+         .text(`$${ytdStatutoryDeductions}`, leftTableX + ytdColWidth * 2, currentYtdY + 4, { width: ytdColWidth - 5, align: 'right' });
       
       currentYtdY += ytdRowHeight;
       
@@ -512,7 +516,31 @@ const generatePaystubPDF = async (payrollItem, periodData, options = {}) => {
       
       currentYtdY += ytdRowHeight;
       
-      // Row 6: Net Pay - compact
+      // Row 6: Holiday Hours - compact
+      const holidayHours = payrollItem.holidayHours || payrollItem.holiday_hours || 0;
+      doc.rect(leftTableX, currentYtdY, tableWidth, ytdRowHeight)
+         .fillAndStroke(colors.lightGray, colors.border);
+         
+      doc.fillColor(colors.text).fontSize(8).font('Helvetica')
+         .text('Holiday Hours', leftTableX + 5, currentYtdY + 4, { width: ytdColWidth - 5, align: 'left' })
+         .text(`${holidayHours}`, leftTableX + ytdColWidth, currentYtdY + 4, { width: ytdColWidth - 5, align: 'center' })
+         .text(`${ytdHolidayHours}`, leftTableX + ytdColWidth * 2, currentYtdY + 4, { width: ytdColWidth - 5, align: 'right' });
+      
+      currentYtdY += ytdRowHeight;
+      
+      // Row 7: Holiday Amount - compact
+      const holidayAmount = parseFloat(payrollItem.holidayAmount || payrollItem.holiday_amount || 0).toFixed(2);
+      doc.rect(leftTableX, currentYtdY, tableWidth, ytdRowHeight)
+         .fillAndStroke('white', colors.border);
+         
+      doc.fillColor(colors.text).fontSize(8).font('Helvetica')
+         .text('Holiday Amount', leftTableX + 5, currentYtdY + 4, { width: ytdColWidth - 5, align: 'left' })
+         .text(`$${holidayAmount}`, leftTableX + ytdColWidth, currentYtdY + 4, { width: ytdColWidth - 5, align: 'center' })
+         .text(`$${ytdHolidayAmount}`, leftTableX + ytdColWidth * 2, currentYtdY + 4, { width: ytdColWidth - 5, align: 'right' });
+      
+      currentYtdY += ytdRowHeight;
+      
+      // Row 8: Net Pay - compact
       doc.rect(leftTableX, currentYtdY, tableWidth, ytdRowHeight)
          .fillAndStroke(colors.primary, colors.primary);
          
@@ -520,6 +548,64 @@ const generatePaystubPDF = async (payrollItem, periodData, options = {}) => {
          .text('Net Pay', leftTableX + 5, currentYtdY + 4, { width: ytdColWidth - 5, align: 'left' })
          .text(`$${netPay}`, leftTableX + ytdColWidth, currentYtdY + 4, { width: ytdColWidth - 5, align: 'center' })
          .text(`$${ytdNetPay}`, leftTableX + ytdColWidth * 2, currentYtdY + 4, { width: ytdColWidth - 5, align: 'right' });
+      
+      // Add Employer YTD Contributions section
+      currentYtdY += ytdRowHeight + 15;
+      
+      // YTD Employer Contributions header
+      doc.rect(leftTableX, currentYtdY, tableWidth, 20)
+         .fillAndStroke(colors.secondary, colors.secondary);
+         
+      doc.fillColor('white')
+         .fontSize(12).font('Helvetica-Bold')
+         .text('YTD Employer Contributions', leftTableX + 10, currentYtdY + 5);
+         
+      // Table header background
+      currentYtdY += 20;
+      doc.rect(leftTableX, currentYtdY, tableWidth, 18)
+         .fillAndStroke('#e9ecef', colors.border);
+         
+      // Table header text
+      doc.fillColor(colors.text)
+         .fontSize(9).font('Helvetica-Bold')
+         .text('Description', leftTableX + 5, currentYtdY + 5, { width: ytdColWidth - 5, align: 'left' })
+         .text('Current', leftTableX + ytdColWidth, currentYtdY + 5, { width: ytdColWidth - 5, align: 'center' })
+         .text('Year-To-Date', leftTableX + ytdColWidth * 2, currentYtdY + 5, { width: ytdColWidth - 5, align: 'right' });
+      
+      currentYtdY += 18;
+      
+      // Row 1: Social Security Employer
+      doc.rect(leftTableX, currentYtdY, tableWidth, ytdRowHeight)
+         .fillAndStroke('white', colors.border);
+         
+      doc.fillColor(colors.text).fontSize(8).font('Helvetica')
+         .text('Social Security (9%)', leftTableX + 5, currentYtdY + 4, { width: ytdColWidth - 5, align: 'left' })
+         .text(`$${socialSecurityEmployer}`, leftTableX + ytdColWidth, currentYtdY + 4, { width: ytdColWidth - 5, align: 'center' })
+         .text(`$${ytdSocialSecurityEmployer}`, leftTableX + ytdColWidth * 2, currentYtdY + 4, { width: ytdColWidth - 5, align: 'right' });
+      
+      currentYtdY += ytdRowHeight;
+      
+      // Row 2: Medical Benefits Employer
+      doc.rect(leftTableX, currentYtdY, tableWidth, ytdRowHeight)
+         .fillAndStroke(colors.lightGray, colors.border);
+         
+      doc.fillColor(colors.text).fontSize(8).font('Helvetica')
+         .text('Medical Benefits', leftTableX + 5, currentYtdY + 4, { width: ytdColWidth - 5, align: 'left' })
+         .text(`$${medicalBenefitsEmployer}`, leftTableX + ytdColWidth, currentYtdY + 4, { width: ytdColWidth - 5, align: 'center' })
+         .text(`$${ytdMedicalBenefitsEmployer}`, leftTableX + ytdColWidth * 2, currentYtdY + 4, { width: ytdColWidth - 5, align: 'right' });
+      
+      currentYtdY += ytdRowHeight;
+      
+      // Row 3: Total Employer Contributions
+      const totalEmployerYtdContributions = (parseFloat(ytdSocialSecurityEmployer) + parseFloat(ytdMedicalBenefitsEmployer)).toFixed(2);
+      
+      doc.rect(leftTableX, currentYtdY, tableWidth, ytdRowHeight)
+         .fillAndStroke(colors.primary, colors.primary);
+         
+      doc.fillColor('white').fontSize(8).font('Helvetica-Bold')
+         .text('Total Employer Contributions', leftTableX + 5, currentYtdY + 4, { width: ytdColWidth - 5, align: 'left' })
+         .text(`$${totalEmployerContributions.toFixed(2)}`, leftTableX + ytdColWidth, currentYtdY + 4, { width: ytdColWidth - 5, align: 'center' })
+         .text(`$${totalEmployerYtdContributions}`, leftTableX + ytdColWidth * 2, currentYtdY + 4, { width: ytdColWidth - 5, align: 'right' });
       
       // Add loan/vacation information if available
       let extraContentHeight = 0;
