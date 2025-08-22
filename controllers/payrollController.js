@@ -171,6 +171,24 @@ exports.uploadTimesheet = async (req, res) => {
         }));
       } catch (dbError) {
         console.error('Database error:', dbError);
+        
+        // Check if this is a duplicate period error
+        if (dbError.message && dbError.message.includes('duplicate') || 
+            dbError.message && dbError.message.includes('already been uploaded')) {
+          return res.status(409).json(formatError({
+            message: 'This pay period already exists in the system. Each period can only be uploaded once.',
+            details: dbError.message
+          }));
+        }
+        
+        // Handle unique constraint violation from MySQL
+        if (dbError.code === 'ER_DUP_ENTRY') {
+          return res.status(409).json(formatError({
+            message: 'This pay period already exists in the system. Each period can only be uploaded once.',
+            details: 'Duplicate period detected'
+          }));
+        }
+        
         return res.status(500).json(formatError({
           message: 'Error saving timesheet data to the database',
           details: dbError.message

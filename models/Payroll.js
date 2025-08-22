@@ -221,19 +221,23 @@ class Payroll {
                 standardHoursPerPeriod = employeeStandardHours * 4; // 4 weeks per month based on employee's weekly hours
               }
               
-              // Get total worked hours (excluding vacation, which is already paid in salary)
-              const totalWorkedHours = employeeInfo.totalHours;
+              // Get vacation hours for this employee
+              const vacationHoursForPeriod = vacationData.vacationHours || 0;
               
-              // Prorate salary based on hours worked vs expected hours
-              // Only prorate if hours worked is less than standard hours
+              // Get total hours including both worked hours and vacation hours
+              // For salaried employees, vacation hours should count as worked hours
+              const totalWorkedHours = employeeInfo.totalHours + vacationHoursForPeriod;
+              
+              // Prorate salary based on total hours (worked + vacation) vs expected hours
+              // Only prorate if total hours is less than standard hours
               if (totalWorkedHours < standardHoursPerPeriod) {
                 const proratedFactor = totalWorkedHours / standardHoursPerPeriod;
                 grossPay = baseSalaryForPeriod * proratedFactor;
-                console.log(`Prorating salary: ${totalWorkedHours} hours worked out of ${standardHoursPerPeriod} standard hours`);
+                console.log(`Prorating salary: ${employeeInfo.totalHours} worked hours + ${vacationHoursForPeriod} vacation hours = ${totalWorkedHours} total hours out of ${standardHoursPerPeriod} standard hours`);
                 console.log(`Proration factor: ${proratedFactor.toFixed(4)}, Base salary: ${baseSalaryForPeriod}, Prorated salary: ${grossPay}`);
               } else {
                 grossPay = baseSalaryForPeriod;
-                console.log(`No proration needed: ${totalWorkedHours} hours worked meets or exceeds ${standardHoursPerPeriod} standard hours`);
+                console.log(`No proration needed: ${employeeInfo.totalHours} worked hours + ${vacationHoursForPeriod} vacation hours = ${totalWorkedHours} total hours meets or exceeds ${standardHoursPerPeriod} standard hours`);
               }
               
               // For salaried employees, vacation hours are counted as worked hours
@@ -243,7 +247,7 @@ class Payroll {
               
               // Log vacation hours if any
               if (vacationData.vacationHours > 0) {
-                console.log(`Salaried employee vacation: ${vacationData.vacationHours} hours (included in salary)`);
+                console.log(`Salaried employee vacation: ${vacationData.vacationHours} hours (included in worked hours for proration)`);
               }
               
               // For salaried employees, holiday pay is extra (added to salary)

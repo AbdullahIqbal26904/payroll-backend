@@ -13,6 +13,19 @@ class Timesheet {
    */
   static async saveTimeEntries(entries, periodInfo) {
     try {
+      // Check if a period with the same start and end dates already exists
+      if (periodInfo.periodStart && periodInfo.periodEnd) {
+        const [existingPeriods] = await db.query(
+          `SELECT id FROM timesheet_periods 
+           WHERE period_start = ? AND period_end = ?`,
+          [periodInfo.periodStart, periodInfo.periodEnd]
+        );
+        
+        if (existingPeriods.length > 0) {
+          throw new Error('A timesheet for this period has already been uploaded. Cannot upload duplicate periods.');
+        }
+      }
+      
       // Insert period info first
       const [periodResult] = await db.query(
         `INSERT INTO timesheet_periods (
