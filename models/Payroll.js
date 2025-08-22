@@ -205,15 +205,20 @@ class Payroll {
               const baseSalaryForPeriod = salaryAmount / payPeriods;
               
               // Calculate standard hours for the period based on payment frequency
+              // First check if employee has custom standard hours defined
+              // Fix for salary proration issue: Now calculating based on employee's actual standard hours
+              // rather than using fixed values that might not match the employee's expected monthly hours
+              const employeeStandardHours = employeeData.standard_hours || 40; // Default to 40 hours per week
+              
               let standardHoursPerPeriod;
               if (employeeData.payment_frequency === 'Weekly') {
-                standardHoursPerPeriod = 40; // 40 hours per week
+                standardHoursPerPeriod = employeeStandardHours; // Use employee's standard weekly hours
               } else if (employeeData.payment_frequency === 'Bi-Weekly') {
-                standardHoursPerPeriod = 80; // 80 hours per bi-weekly period
+                standardHoursPerPeriod = employeeStandardHours * 2; // 2 weeks
               } else if (employeeData.payment_frequency === 'Semi-Monthly') {
-                standardHoursPerPeriod = 86.7; // ~86.7 hours per semi-monthly period (based on 4.33 weeks/month)
+                standardHoursPerPeriod = employeeStandardHours * (4.33 / 2); // Half month based on employee's weekly hours
               } else { // Monthly
-                standardHoursPerPeriod = 173.3; // ~173.3 hours per month (based on 4.33 weeks/month)
+                standardHoursPerPeriod = employeeStandardHours * 4; // 4 weeks per month based on employee's weekly hours
               }
               
               // Get total worked hours (excluding vacation, which is already paid in salary)
