@@ -1,4 +1,4 @@
-# Comprehensive Payroll Management System with AI Integration
+# Comprehensive Payroll, Expense & Tax Management System with AI Integration
 ## BS in Computer Science Final Year Project Proposal
 
 ---
@@ -171,6 +171,36 @@ The NLP system will use a specialized architecture:
 **Business Value:**
 This component significantly reduces the time HR and payroll staff spend answering routine questions (estimated 30% reduction), improves employee satisfaction through self-service access to information, and proactively identifies potential errors before they impact payments.
 
+### 6. Expense & Receipt Management (New Feature)
+
+**What it does:**
+This module allows employees to upload purchase receipts and expense documents directly into the system. The platform will automatically extract relevant data (merchant, date, amount, tax paid, category) using OCR and RAG techniques, associate the expense with the employee, and maintain a searchable record. At year-end, employees can generate consolidated expense and tax reports to simplify personal tax filing or reimbursement workflows.
+
+**Functionality:**
+- Receipt upload via web or mobile app
+- OCR extraction of key fields (date, merchant, total, tax, line items)
+- Automatic categorization (e.g., travel, meals, supplies)
+- Cross-validation with company expense policies
+- Tagging receipts as reimbursable or personal
+- Aggregated reports for year-end tax preparation
+
+**Real-World Examples:**
+- **Scenario 1:** An employee uploads a taxi receipt. The system extracts the amount and VAT paid, categorizes it as "Travel", and marks it as reimbursable. The receipt appears in the employee's expense ledger.
+- **Scenario 2:** An employee uploads multiple receipts throughout the year. At year-end they download a consolidated report showing total deductible expenses and total tax paid, making personal tax filing straightforward.
+
+**Technical Implementation:**
+- Use Tesseract OCR or cloud OCR APIs (Google Vision, AWS Textract) for text extraction
+- Use RAG with a vector store to improve extraction accuracy for inconsistent receipt formats
+- Store raw receipt images in object storage (S3 or Azure Blob) and metadata in MongoDB
+- Implement workflows for manual review and approval when OCR confidence is low
+- Integrate extracted expense data into the data warehouse for combined payroll + expense analytics
+
+**Business Value:**
+- Simplifies employees' year-end tax filing by providing consolidated expense reports
+- Ensures accurate tracking of deductible expenses and taxes paid per employee
+- Supports company reimbursement policies and reduces manual expense processing time
+- Adds a valuable personal finance feature that can improve employee satisfaction and retention
+
 ### 4. Data Warehouse with Star Schema
 
 **What it does:**
@@ -331,14 +361,14 @@ The Power BI implementation delivers:
 │ - Power BI Dashboa.│     │ - RAG System         │     │   (MongoDB)       │
 │ - Admin Portal     │     │ - ETL Pipeline       │     │ - Data Warehouse  │
 └────────────────────┘     └──────────────────────┘     │   (Star Schema)   │
-                                      ▲                  └───────────────────┘
+                                      ▲                 └───────────────────┘
                                       │                            ▲
                                       │                            │
                                       ▼                            │
-┌───────────────────────────┐    ┌──────────────────┐             │
-│  AI & ML Components       │    │ Integration Layer│             │
-├───────────────────────────┤    ├──────────────────┤             │
-│ - Facial Recognition Model│◄──►│ - API Gateway    │◄────────────┘
+┌───────────────────────────┐    ┌──────────────────┐              │
+│  AI & ML Components       │    │ Integration Layer│              │
+├───────────────────────────┤    ├──────────────────┤              │
+│ - Facial Recognition Model│◄──►│ - API Gateway    │◄─-───────────┘
 │ - NLP Model               │    │ - Event Bus      │
 │ - Document Understanding  │    │ - Authentication │
 │ - Anomaly Detection       │    │ - Authorization  │
@@ -408,7 +438,8 @@ The Power BI implementation delivers:
 **Phase 3: NLP & RAG Implementation (6 weeks)**
 - Develop conversational interface
 - Train NLP models on payroll domain data
-- Implement document processing capabilities
+- Implement document processing capabilities (including receipt OCR and expense extraction)
+- Implement receipt upload & employee expense tracking workflows
 - Create anomaly detection algorithms
 
 **Phase 4: Data Warehouse & ETL (5 weeks)**
