@@ -290,7 +290,7 @@ const generatePaystubPDF = async (payrollItem, periodData, options = {}) => {
          .fillAndStroke('white', colors.border);
          
       doc.fillColor(colors.text).fontSize(8).font('Helvetica')
-         .text('Social Security (7%)', rightTableX + 5, deductionY + 5, { width: colWidth * 2 - 5, align: 'left' })
+         .text('Social Security', rightTableX + 5, deductionY + 5, { width: colWidth * 2 - 5, align: 'left' })
          .text(`$${socialSecurityEmployee}`, rightTableX + colWidth * 2, deductionY + 5, { width: colWidth - 10, align: 'right' });
       
       deductionY += rowHeight;
@@ -374,9 +374,10 @@ const generatePaystubPDF = async (payrollItem, periodData, options = {}) => {
       // Now, the bottom of the two tables is the maximum of the bottom of the earnings table (currentY) and the deductionsBottom
       const tablesBottom = Math.max(currentY, deductionsBottom);
       
-      // Set the starting Y for the employer contributions section with a smaller gap
-      const employerContribY = tablesBottom + 10; // Reduced spacing
-
+      // Set the starting Y for the YTD summary section with a smaller gap
+      const ytdY = tablesBottom + 10; // Reduced spacing
+      
+      /* Commented out Employer Contributions section as per client request
       // Add employer contributions section on first page - more compact
       // Section header with colored background
       doc.rect(leftTableX, employerContribY, tableWidth, 20) // Full width for employer section
@@ -428,6 +429,7 @@ const generatePaystubPDF = async (payrollItem, periodData, options = {}) => {
       
       // Add YTD Summary right after employer contributions on the same page
       const ytdY = employerContribY + 38 + rowHeight * 3 + 10;
+      */
       
       // YTD Summary section header with colored background
       doc.rect(leftTableX, ytdY, tableWidth, 20)
@@ -558,6 +560,7 @@ const generatePaystubPDF = async (payrollItem, periodData, options = {}) => {
          .text(`$${netPay}`, leftTableX + ytdColWidth, currentYtdY + 4, { width: ytdColWidth - 5, align: 'center' })
          .text(`$${ytdNetPay}`, leftTableX + ytdColWidth * 2, currentYtdY + 4, { width: ytdColWidth - 5, align: 'right' });
       
+      /* Commented out YTD Employer Contributions section as per client request
       // Add Employer YTD Contributions section
       currentYtdY += ytdRowHeight + 15;
       
@@ -615,54 +618,105 @@ const generatePaystubPDF = async (payrollItem, periodData, options = {}) => {
          .text('Total Employer Contributions', leftTableX + 5, currentYtdY + 4, { width: ytdColWidth - 5, align: 'left' })
          .text(`$${totalEmployerContributions.toFixed(2)}`, leftTableX + ytdColWidth, currentYtdY + 4, { width: ytdColWidth - 5, align: 'center' })
          .text(`$${totalEmployerYtdContributions}`, leftTableX + ytdColWidth * 2, currentYtdY + 4, { width: ytdColWidth - 5, align: 'right' });
+      */
       
       // Add loan/vacation information if available
       let extraContentHeight = 0;
       
       if (options.loanDetails && options.loanDetails.length > 0) {
-        // Add compact loan details on the first page
+        // Add loan details in a proper tabular format like other sections
         const loanY = currentYtdY + 20; // Reduced spacing
         const loanInfoX = margin;
         const loanWidth = tableWidth;
         
+        // Section header with colored background
         doc.rect(loanInfoX, loanY, loanWidth, 20) // Reduced height
           .fillAndStroke(colors.secondary, colors.secondary);
           
         doc.fillColor('white')
-          .fontSize(9).font('Helvetica-Bold') // Smaller font
+          .fontSize(12).font('Helvetica-Bold')
           .text('Loan Information', loanInfoX + 10, loanY + 5);
           
+        // Table header background
+        doc.rect(loanInfoX, loanY + 20, loanWidth, 18)
+          .fillAndStroke('#e9ecef', colors.border);
+        
+        // Define column widths for the loan table - 4 columns
+        const loanColWidth = loanWidth / 4;
+        
+        // Table header text
+        doc.fillColor(colors.text)
+          .fontSize(9).font('Helvetica-Bold')
+          .text('Loan Type', loanInfoX + 5, loanY + 25, { width: loanColWidth - 5, align: 'left' })
+          .text('Loan ID', loanInfoX + loanColWidth, loanY + 25, { width: loanColWidth - 5, align: 'left' })
+          .text('Payment', loanInfoX + loanColWidth * 2, loanY + 25, { width: loanColWidth - 5, align: 'center' })
+          .text('Balance Remaining', loanInfoX + loanColWidth * 3, loanY + 25, { width: loanColWidth - 5, align: 'right' });
+        
         const internalLoans = options.loanDetails.filter(loan => loan.loan_type !== 'third_party');
         const thirdPartyLoans = options.loanDetails.filter(loan => loan.loan_type === 'third_party');
         
-        doc.fillColor(colors.text).fontSize(7).font('Helvetica'); // Smaller font
+        // Start position for the loan rows
+        let currentLoanY = loanY + 38;
+        let rowCounter = 0;
         
-        let currentLoanY = loanY + 5;
+        // Display internal loans in rows
+        internalLoans.forEach((loan) => {
+          const payment = parseFloat(loan.paymentAmount || loan.payment || 0).toFixed(2);
+          const balance = parseFloat(loan.remainingBalance || 0).toFixed(2);
+          const loanId = loan.loanId || loan.id || 'N/A';
+          
+          // Alternate row background colors
+          const rowBg = rowCounter % 2 === 0 ? 'white' : colors.lightGray;
+          
+          doc.rect(loanInfoX, currentLoanY, loanWidth, ytdRowHeight)
+            .fillAndStroke(rowBg, colors.border);
+            
+          doc.fillColor(colors.text).fontSize(8).font('Helvetica')
+            .text('Internal Loan', loanInfoX + 5, currentLoanY + 4, { width: loanColWidth - 5, align: 'left' })
+            .text(`#${loanId}`, loanInfoX + loanColWidth, currentLoanY + 4, { width: loanColWidth - 5, align: 'left' })
+            .text(`$${payment}`, loanInfoX + loanColWidth * 2, currentLoanY + 4, { width: loanColWidth - 5, align: 'center' })
+            .text(`$${balance}`, loanInfoX + loanColWidth * 3, currentLoanY + 4, { width: loanColWidth - 5, align: 'right' });
+          
+          currentLoanY += ytdRowHeight;
+          rowCounter++;
+        });
         
-        if (internalLoans.length > 0) {
-          let loanDetails = 'Internal: ';
-          internalLoans.forEach((loan, idx) => {
-            const payment = parseFloat(loan.paymentAmount || loan.payment || 0).toFixed(2);
-            const balance = parseFloat(loan.remainingBalance || 0).toFixed(2);
-            loanDetails += `#${loan.loanId || loan.id} ($${payment} payment, $${balance} remaining)`;
-            if (idx < internalLoans.length - 1) loanDetails += '; ';
-          });
-          doc.text(loanDetails, loanInfoX + 100, currentLoanY, { width: loanWidth - 110, align: 'left' });
-          currentLoanY += 10;
+        // Display third-party loans in rows
+        thirdPartyLoans.forEach((loan) => {
+          const payment = parseFloat(loan.paymentAmount || loan.payment || 0).toFixed(2);
+          const balance = parseFloat(loan.remainingBalance || 0).toFixed(2);
+          const loanId = loan.loanId || loan.id || 'N/A';
+          const provider = loan.provider || 'External';
+          
+          // Alternate row background colors
+          const rowBg = rowCounter % 2 === 0 ? 'white' : colors.lightGray;
+          
+          doc.rect(loanInfoX, currentLoanY, loanWidth, ytdRowHeight)
+            .fillAndStroke(rowBg, colors.border);
+            
+          doc.fillColor(colors.text).fontSize(8).font('Helvetica')
+            .text(`Third Party (${provider})`, loanInfoX + 5, currentLoanY + 4, { width: loanColWidth - 5, align: 'left' })
+            .text(`#${loanId}`, loanInfoX + loanColWidth, currentLoanY + 4, { width: loanColWidth - 5, align: 'left' })
+            .text(`$${payment}`, loanInfoX + loanColWidth * 2, currentLoanY + 4, { width: loanColWidth - 5, align: 'center' })
+            .text(`$${balance}`, loanInfoX + loanColWidth * 3, currentLoanY + 4, { width: loanColWidth - 5, align: 'right' });
+          
+          currentLoanY += ytdRowHeight;
+          rowCounter++;
+        });
+        
+        // If there are no loans, show a message
+        if (internalLoans.length === 0 && thirdPartyLoans.length === 0) {
+          doc.rect(loanInfoX, loanY + 38, loanWidth, ytdRowHeight)
+            .fillAndStroke('white', colors.border);
+            
+          doc.fillColor(colors.text).fontSize(8).font('Helvetica')
+            .text('No active loans', loanInfoX + 5, loanY + 42, { width: loanWidth - 10, align: 'center' });
+          
+          currentLoanY += ytdRowHeight;
         }
         
-        if (thirdPartyLoans.length > 0) {
-          let tpLoanDetails = 'Third Party: ';
-          thirdPartyLoans.forEach((loan, idx) => {
-            const payment = parseFloat(loan.paymentAmount || loan.payment || 0).toFixed(2);
-            const balance = parseFloat(loan.remainingBalance || 0).toFixed(2);
-            tpLoanDetails += `${loan.provider || 'External'} #${loan.loanId || loan.id} ($${payment} payment, $${balance} remaining)`;
-            if (idx < thirdPartyLoans.length - 1) tpLoanDetails += '; ';
-          });
-          doc.text(tpLoanDetails, loanInfoX + 100, currentLoanY, { width: loanWidth - 110, align: 'left' });
-        }
-        
-        extraContentHeight += thirdPartyLoans.length > 0 ? 35 : 25;
+        // Calculate total height of the loan section
+        extraContentHeight = currentLoanY - loanY;
       }
       
       // Add vacation information if available
@@ -673,19 +727,41 @@ const generatePaystubPDF = async (payrollItem, periodData, options = {}) => {
         
         const vacationBalance = parseFloat(payrollItem.vacation_balance || 0).toFixed(2);
         const annualPtoHours = parseFloat(payrollItem.annual_pto_hours || 0).toFixed(2);
+        const usedPtoHours = (parseFloat(annualPtoHours) - parseFloat(vacationBalance)).toFixed(2);
         
+        // Section header with colored background
         doc.rect(vacationInfoX, vacationY, vacInfoWidth, 20)
           .fillAndStroke(colors.secondary, colors.secondary);
           
         doc.fillColor('white')
-          .fontSize(9).font('Helvetica-Bold') // Smaller font
+          .fontSize(12).font('Helvetica-Bold')
           .text('Vacation Entitlement', vacationInfoX + 10, vacationY + 5);
-          
-        doc.fillColor(colors.text).fontSize(7).font('Helvetica') // Smaller font
-          .text(`Annual: ${annualPtoHours} hrs`, vacationInfoX + 150, vacationY + 5, { width: 100, align: 'left' })
-          .text(`Balance: ${vacationBalance} hrs`, vacationInfoX + 250, vacationY + 5, { width: 100, align: 'left' });
         
-        extraContentHeight += 25;
+        // Table header background
+        doc.rect(vacationInfoX, vacationY + 20, vacInfoWidth, 18)
+          .fillAndStroke('#e9ecef', colors.border);
+        
+        // Define column widths for the vacation table - 3 columns
+        const vacColWidth = vacInfoWidth / 3;
+        
+        // Table header text
+        doc.fillColor(colors.text)
+          .fontSize(9).font('Helvetica-Bold')
+          .text('Annual Entitlement', vacationInfoX + 5, vacationY + 25, { width: vacColWidth - 5, align: 'left' })
+          .text('Used Hours', vacationInfoX + vacColWidth, vacationY + 25, { width: vacColWidth - 5, align: 'center' })
+          .text('Remaining Balance', vacationInfoX + vacColWidth * 2, vacationY + 25, { width: vacColWidth - 5, align: 'right' });
+        
+        // Vacation data row
+        doc.rect(vacationInfoX, vacationY + 38, vacInfoWidth, ytdRowHeight)
+          .fillAndStroke('white', colors.border);
+          
+        doc.fillColor(colors.text).fontSize(8).font('Helvetica')
+          .text(`${annualPtoHours} hrs`, vacationInfoX + 5, vacationY + 42, { width: vacColWidth - 5, align: 'left' })
+          .text(`${usedPtoHours} hrs`, vacationInfoX + vacColWidth, vacationY + 42, { width: vacColWidth - 5, align: 'center' })
+          .text(`${vacationBalance} hrs`, vacationInfoX + vacColWidth * 2, vacationY + 42, { width: vacColWidth - 5, align: 'right' });
+        
+        // Update extra content height to account for the new tabular format
+        extraContentHeight += 38 + ytdRowHeight;
       }
       
       // Add a footer with gradient background - positioned after all content
