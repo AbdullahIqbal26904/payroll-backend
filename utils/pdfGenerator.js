@@ -243,18 +243,7 @@ const generatePaystubPDF = async (payrollItem, periodData, options = {}) => {
            .text(`$${vacationAmount}`, leftTableX + colWidth * 2, currentY + 5, { width: colWidth - 10, align: 'right' });
       }
       
-      // Gross pay total with highlighted background - more compact
-      currentY += rowHeight;
-      doc.rect(leftTableX, currentY, halfTableWidth, rowHeight)
-         .fillAndStroke(colors.primary, colors.primary);
-         
-      doc.fillColor('white').fontSize(8).font('Helvetica-Bold')
-         .text('Gross Pay', leftTableX + 5, currentY + 5, { width: colWidth - 5, align: 'left' })
-         .text('', leftTableX + colWidth, currentY + 5, { width: colWidth - 5, align: 'right' })
-         .text(`$${grossPay}`, leftTableX + colWidth * 2, currentY + 5, { width: colWidth - 10, align: 'right' });
-      
-      // Update currentY to the bottom of the gross pay row
-      currentY += rowHeight;
+      // We will handle the Gross Pay later to align with Net Pay
 
       // Deductions section on the right side - more compact
       doc.rect(rightTableX, tablesStartY, halfTableWidth, 20) // Reduced height
@@ -361,6 +350,17 @@ const generatePaystubPDF = async (payrollItem, periodData, options = {}) => {
       // Net pay box with accent color - more compact
       const netPayBoxY = deductionY + 5;
       const netPayBoxHeight = rowHeight;
+      
+      // Now add Gross Pay on the left aligned with the Net Pay on the right
+      // Gross pay total with highlighted background - more compact
+      doc.rect(leftTableX, netPayBoxY, halfTableWidth, netPayBoxHeight)
+         .fillAndStroke(colors.primary, colors.primary);
+         
+      doc.fillColor('white').fontSize(10).font('Helvetica-Bold')
+         .text('GROSS PAY', leftTableX + 5, netPayBoxY + 5, { width: colWidth - 5, align: 'left' })
+         .text(`$${grossPay}`, leftTableX + colWidth * 2, netPayBoxY + 5, { width: colWidth - 10, align: 'right' });
+      
+      // Net Pay box on the right side
       doc.rect(rightTableX, netPayBoxY, halfTableWidth, netPayBoxHeight)
          .fillAndStroke(colors.accent, colors.accent);
          
