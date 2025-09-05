@@ -18,6 +18,13 @@ Phase 2 has been implemented with the following features:
 
 ## Latest Updates
 
+- Added secure ACH Banking Information Management:
+  - Secure storage of employee banking details with AES-256-CBC encryption
+  - Support for multiple bank accounts per employee with primary account designation
+  - Comprehensive API for managing banking information
+  - Data masking for sensitive information in API responses
+  - Role-based access control for banking data
+
 - Added management-focused deductions report for analyzing employee contributions:
   - Detailed breakdown of social security, medical benefits, and education levy contributions
   - Filter by all employees, date range, or department
@@ -44,6 +51,7 @@ Phase 2 has been implemented with the following features:
    DB_NAME=payroll_system
    JWT_SECRET=your_jwt_secret
    JWT_EXPIRE=7d
+   ENCRYPTION_KEY=32charactersecretkeyrequiredhere
    EMAIL_HOST=smtp.example.com
    EMAIL_PORT=587
    EMAIL_USER=your_email@example.com
@@ -128,6 +136,16 @@ A Postman collection is included at the root of the project (`Payroll_System_API
 | GET | `/api/employees/:id` | Get a single employee |
 | PUT | `/api/employees/:id` | Update employee |
 | DELETE | `/api/employees/:id` | Delete employee |
+
+### Banking Information Management (Admin only)
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/employees/:id/banking` | Get all banking records for an employee |
+| POST | `/api/employees/:id/banking` | Add banking information for an employee |
+| GET | `/api/employees/:id/banking/:bankingId` | Get a specific banking record |
+| PUT | `/api/employees/:id/banking/:bankingId` | Update banking information |
+| DELETE | `/api/employees/:id/banking/:bankingId` | Delete banking information |
 
 ## Phase 1 Features
 

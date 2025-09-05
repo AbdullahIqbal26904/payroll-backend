@@ -10,6 +10,9 @@ const { getEmployeeLoans } = require('../controllers/loanController');
 const { protect, authorize, auditLogger } = require('../middlewares/auth');
 const { employeeValidation, employeeUpdateValidation, validateRequest } = require('../middlewares/validator');
 
+// Import banking routes
+const bankingRoutes = require('./bankingRoutes');
+
 const router = express.Router();
 
 // Protect all routes
@@ -30,5 +33,8 @@ router
 
 // Route for getting employee loans
 router.route('/:id/loans').get(getEmployeeLoans);
+
+// Mount banking routes
+router.use('/:id/banking', bankingRoutes);
 
 module.exports = router;

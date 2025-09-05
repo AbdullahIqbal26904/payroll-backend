@@ -78,6 +78,27 @@ exports.departmentUpdateValidation = [
   check('description', 'Description must be a string').optional().isString()
 ];
 
+// Validation for banking information creation
+exports.bankingInfoValidation = [
+  check('bank_name', 'Bank name is required').not().isEmpty(),
+  check('account_type', 'Account type must be Checking or Savings').isIn(['Checking', 'Savings']),
+  check('account_number', 'Account number is required').not().isEmpty().isString(),
+  check('routing_number', 'Routing number is required').not().isEmpty().isString(),
+  check('is_primary', 'Primary flag must be a boolean').optional().isBoolean(),
+  check('direct_deposit_enabled', 'Direct deposit flag must be a boolean').optional().isBoolean()
+];
+
+// Validation for banking information update
+exports.bankingInfoUpdateValidation = [
+  check('bank_name', 'Bank name must be a string').optional().isString(),
+  check('account_type', 'Account type must be Checking or Savings').optional().isIn(['Checking', 'Savings']),
+  check('account_number', 'Account number must be a string').optional().isString(),
+  check('routing_number', 'Routing number must be a string').optional().isString(),
+  check('is_primary', 'Primary flag must be a boolean').optional().isBoolean(),
+  check('is_active', 'Active flag must be a boolean').optional().isBoolean(),
+  check('direct_deposit_enabled', 'Direct deposit flag must be a boolean').optional().isBoolean()
+];
+
 // Middleware to validate request
 exports.validateRequest = (req, res, next) => {
   const errors = validationResult(req);
