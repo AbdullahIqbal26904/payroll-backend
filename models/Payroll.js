@@ -1185,6 +1185,138 @@ class Payroll {
       throw error;
     }
   }
+  
+  /**
+   * Generate ACH report for a specific payroll run
+   * @param {number} payrollRunId - Payroll run ID
+   * @returns {Promise<Object>} ACH report data with banking details for direct deposits
+   */
+  static async generateACHReport(payrollRunId) {
+    try {
+      // Get the payroll run to ensure it exists and is in a valid state
+      const [payrollRun] = await db.query(
+        `SELECT * FROM payroll_runs WHERE id = ? AND status IN ('completed', 'completed_with_errors', 'finalized')`,
+        [payrollRunId]
+      );
+      
+      if (payrollRun.length === 0) {
+        throw new Error('Payroll run not found or not in a completed state');
+      }
+      
+      // Get payroll items with employee banking information
+      const [achData] = await db.query(
+        `SELECT 
+          pi.id as payroll_item_id,
+          pi.employee_id,
+          CONCAT(e.first_name, ' ', e.last_name) as employee_name,
+          pi.net_pay,
+          ebi.bank_name,
+          ebi.account_type,
+          ebi.account_number_encrypted,
+          ebi.routing_number_encrypted,
+          ebi.direct_deposit_enabled
+        FROM 
+          payroll_items pi
+        JOIN 
+          employees e ON pi.employee_id = e.id
+        LEFT JOIN 
+          employee_banking_info ebi ON e.id = ebi.employee_id AND ebi.is_primary = TRUE AND ebi.is_active = TRUE AND ebi.direct_deposit_enabled = TRUE
+        WHERE 
+          pi.payroll_run_id = ?
+          AND pi.net_pay > 0
+        ORDER BY 
+          e.last_name, e.first_name`,
+        [payrollRunId]
+      );
+      
+      // Process the data to include decrypted and masked account information
+      const { decrypt } = require('../utils/encryptionUtils');
+      
+      // Process each record to include decrypted banking info for ACH
+      const processedData = [];
+      let totalAmount = 0;
+      
+      for (const item of achData) {
+        // Skip items without banking info
+        if (!item.account_number_encrypted || !item.routing_number_encrypted) {
+          processedData.push({
+            payroll_item_id: item.payroll_item_id,
+            employee_id: item.employee_id,
+            employee_name: item.employee_name,
+            amount: parseFloat(item.net_pay).toFixed(2),
+            bank_name: 'No banking information available',
+            account_type: null,
+            routing_number: null,
+            account_number: null,
+            has_banking_info: false
+          });
+          continue;
+        }
+        
+        try {
+          // Decrypt the account information
+          const accountNumber = decrypt(item.account_number_encrypted);
+          const routingNumber = decrypt(item.routing_number_encrypted);
+          
+          processedData.push({
+            payroll_item_id: item.payroll_item_id,
+            employee_id: item.employee_id,
+            employee_name: item.employee_name,
+            amount: parseFloat(item.net_pay).toFixed(2),
+            bank_name: item.bank_name,
+            account_type: item.account_type,
+            routing_number: routingNumber,
+            account_number: accountNumber,
+            has_banking_info: true
+          });
+          
+          totalAmount += parseFloat(item.net_pay);
+        } catch (error) {
+          console.error(`Error decrypting banking data for employee ${item.employee_id}:`, error);
+          processedData.push({
+            payroll_item_id: item.payroll_item_id,
+            employee_id: item.employee_id,
+            employee_name: item.employee_name,
+            amount: parseFloat(item.net_pay).toFixed(2),
+            bank_name: 'Error decrypting banking information',
+            account_type: null,
+            routing_number: null,
+            account_number: null,
+            has_banking_info: false,
+            error: 'Failed to decrypt banking information'
+          });
+        }
+      }
+      
+      // Get the payroll run details
+      const [runDetails] = await db.query(
+        `SELECT 
+          pr.*,
+          tp.report_title,
+          tp.period_start,
+          tp.period_end
+        FROM 
+          payroll_runs pr
+        JOIN 
+          timesheet_periods tp ON pr.period_id = tp.id
+        WHERE 
+          pr.id = ?`,
+        [payrollRunId]
+      );
+      
+      return {
+        payrollRun: runDetails[0],
+        items: processedData,
+        summary: {
+          total_amount: totalAmount.toFixed(2),
+          total_transactions: processedData.filter(item => item.has_banking_info).length,
+          transactions_with_missing_info: processedData.filter(item => !item.has_banking_info).length,
+        }
+      };
+    } catch (error) {
+      throw error;
+    }
+  }
 }
 
 module.exports = Payroll;

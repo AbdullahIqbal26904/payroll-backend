@@ -10,6 +10,7 @@ const {
   getPayrollSettings,
   updatePayrollSettings,
   getDeductionsReport,
+  getACHReport,
   upload
 } = require('../controllers/payrollController');
 const { uploadTimesheet } = require('../controllers/timesheetController');
@@ -34,6 +35,7 @@ router.post('/calculate', calculatePayroll);
 router.get('/reports', getPayrollReports);
 router.get('/reports/:id', getPayrollReport);
 router.get('/deductions-report', getDeductionsReport);
+router.get('/ach-report/:id', getACHReport);
 
 // Paystub routes
 // Download a paystub for a specific employee

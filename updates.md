@@ -297,4 +297,34 @@ We've implemented a safeguard mechanism to prevent duplicate period uploads in t
 
 This enhancement prevents accidental duplication of timesheet data, which could lead to payroll calculation errors or double payments. It ensures data integrity and improves the overall reliability of the system.
 
+## Recent Updates (September 6, 2025)
+
+### ACH Report for Direct Deposit Processing
+
+We've implemented the bank-focused ACH report feature for payroll direct deposits with the following capabilities:
+
+1. **Structured ACH Format**:
+   - Report follows banking standard format: [A: Routing Number] [B: Account Number] [C: Saving/Checking] [D: Name] [E: Institute] [F: Amount] [G: Credit]
+   - CSV output optimized for direct import into banking systems
+   - Clean formatting with appropriate headers and consistent data representation
+
+2. **Comprehensive Data Handling**:
+   - Automatically pulls employee banking information for direct deposit processing
+   - Securely handles sensitive banking details with proper encryption and decryption
+   - Masks account numbers in JSON responses for security
+   - Includes only active employees with valid banking information and non-zero payments
+
+3. **Flexible Output Options**:
+   - CSV format for direct banking system upload
+   - JSON format with masked account information for application integration
+   - Summary statistics including total amount and transaction counts
+
+4. **Technical Implementation**:
+   - New API endpoint: `/api/payroll/ach-report/:id` where id is the payroll run ID
+   - Integration with existing banking information system
+   - Secure handling of sensitive financial data
+   - Comprehensive documentation in `/docs/ach-reporting.md`
+
+This feature completes the requested bank-focused reporting functionality, enabling seamless processing of direct deposits through your banking system.
+
 Please review this proposal and let me know if you need any clarification or have additional requirements to discuss.

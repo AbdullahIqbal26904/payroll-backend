@@ -717,6 +717,72 @@ exports.getDeductionsReport = async (req, res) => {
   }
 };
 
+/**
+ * @desc    Get bank-focused ACH report for payroll direct deposits
+ * @route   GET /api/payroll/ach-report/:id
+ * @access  Private/Admin
+ */
+exports.getACHReport = async (req, res) => {
+  try {
+    const { id: payrollRunId } = req.params;
+    const { format = 'csv' } = req.query;
+
+    if (!payrollRunId) {
+      return res.status(400).json(formatError({
+        message: 'Payroll run ID is required'
+      }));
+    }
+
+    // Get the ACH report data from the Payroll model
+    const achReportData = await Payroll.generateACHReport(payrollRunId);
+
+    // If CSV format is requested, convert the data to CSV format
+    if (format === 'csv') {
+      // Create CSV content according to the specified format
+      // [A: Routing Number] [B: Account Number] [C: Saving/Checking] [D: Name] [E: Institute] [F: Amount] [G: Credit]
+      let csvContent = 'Routing Number,Account Number,Saving/Checking,Name,Institute,Amount,Credit\n';
+      
+      // Add data rows only for entries with valid banking information
+      achReportData.items.forEach(item => {
+        if (item.has_banking_info) {
+          csvContent += `${item.routing_number},${item.account_number},${item.account_type},${item.employee_name},${item.bank_name},${item.amount},Cr\n`;
+        }
+      });
+      
+      // Set headers for file download
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', `attachment; filename=ach-report-${achReportData.payrollRun?.period_id || payrollRunId}-${new Date().toISOString().split('T')[0]}.csv`);
+      
+      // Send CSV response
+      return res.send(csvContent);
+    }
+
+    // Process the data to mask sensitive account information in JSON response
+    const maskedResponseData = {
+      payrollRun: achReportData.payrollRun,
+      summary: achReportData.summary,
+      items: achReportData.items.map(item => {
+        // Mask account numbers in the response for security
+        if (item.has_banking_info) {
+          return {
+            ...item,
+            // Mask account number and routing numbers (show only last 4 digits)
+            account_number: `XXXX${item.account_number.slice(-4)}`,
+            routing_number: `XXXX${item.routing_number.slice(-4)}`,
+          };
+        }
+        return item;
+      })
+    };
+
+    // Return JSON response by default
+    return res.status(200).json(formatSuccess('ACH report generated successfully', maskedResponseData));
+  } catch (error) {
+    console.error('Error generating ACH report:', error);
+    return res.status(500).json(formatError(error));
+  }
+};
+
 exports.emailPaystubs = async (req, res) => {
   try {
     const { payrollRunId, sendToAll = false, employeeIds = [] } = req.body;

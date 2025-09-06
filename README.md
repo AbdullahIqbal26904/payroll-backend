@@ -18,6 +18,13 @@ Phase 2 has been implemented with the following features:
 
 ## Latest Updates
 
+- Added bank-focused ACH report for direct deposit processing:
+  - Generate ACH reports for any completed payroll run
+  - Export in CSV format compatible with banking systems
+  - Includes routing number, account number, account type, employee name, bank name, and payment amount
+  - Secure handling of sensitive banking information with proper masking
+  - JSON response option with masked account details for API consumers
+
 - Added secure ACH Banking Information Management:
   - Secure storage of employee banking details with AES-256-CBC encryption
   - Support for multiple bank accounts per employee with primary account designation
@@ -124,6 +131,7 @@ A Postman collection is included at the root of the project (`Payroll_System_API
 | GET | `/api/payroll/settings` | Get payroll settings |
 | PUT | `/api/payroll/settings` | Update payroll settings |
 | GET | `/api/payroll/deductions-report` | Get management-focused deductions report |
+| GET | `/api/payroll/ach-report/:id` | Get bank-focused ACH report for direct deposits |
 
 <!-- Employee Loan Management section removed -->
 
