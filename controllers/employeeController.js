@@ -27,6 +27,8 @@ exports.addEmployee = async (req, res) => {
     payment_frequency,
     is_exempt_ss,
     is_exempt_medical,
+    social_security_no,
+    medical_benefits_no,
   } = req.body;
   
   try {
@@ -124,8 +126,8 @@ exports.addEmployee = async (req, res) => {
     `INSERT INTO employees 
     (id, user_id, first_name, last_name, date_of_birth, gender, address, phone, email,
       hire_date, job_title, employee_type, department_id, salary_amount, hourly_rate, standard_hours, payment_frequency, 
-      is_exempt_ss, is_exempt_medical, date_of_birth_for_age, status) 
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      is_exempt_ss, is_exempt_medical, date_of_birth_for_age, status, social_security_no, medical_benefits_no) 
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       employee_id,
       userId, 
@@ -147,7 +149,9 @@ exports.addEmployee = async (req, res) => {
       is_exempt_ss || false,
       is_exempt_medical || false,
       dateOfBirthForAge,
-      'active' // Default status
+      'active', // Default status
+      social_security_no || null,
+      medical_benefits_no || null
     ]
   );
     
@@ -331,7 +335,9 @@ exports.updateEmployee = async (req, res) => {
     payment_frequency,
     is_exempt_ss,
     is_exempt_medical,
-    status
+    status,
+    social_security_no,
+    medical_benefits_no
   } = req.body;
   
   try {
@@ -415,7 +421,7 @@ exports.updateEmployee = async (req, res) => {
            employee_type = ?, department_id = ?, 
            salary_amount = ?, hourly_rate = ?, standard_hours = ?,
            payment_frequency = ?, is_exempt_ss = ?, is_exempt_medical = ?,
-           status = ?, date_of_birth_for_age = ?
+           status = ?, date_of_birth_for_age = ?, social_security_no = ?, medical_benefits_no = ?
        WHERE id = ?`,
       [
         first_name || employee[0].first_name, 
@@ -437,6 +443,8 @@ exports.updateEmployee = async (req, res) => {
         is_exempt_medical !== undefined ? is_exempt_medical : employee[0].is_exempt_medical,
         status || employee[0].status || 'active',
         dateOfBirthForAge,
+        social_security_no !== undefined ? social_security_no : employee[0].social_security_no,
+        medical_benefits_no !== undefined ? medical_benefits_no : employee[0].medical_benefits_no,
         req.params.id
       ]
     );

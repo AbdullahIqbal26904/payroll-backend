@@ -582,7 +582,17 @@ exports.updatePayrollSettings = async (req, res) => {
       privateDutyNurseNightAll,
       privateDutyNurseDayWeekend,
       privateDutyNurseDayStart,
-      privateDutyNurseDayEnd
+      privateDutyNurseDayEnd,
+      // Government report numbering settings
+      ssReportNumberBase,
+      ssReportNumberCurrent,
+      ssReportAutoIncrement,
+      mbReportNumberBase,
+      mbReportNumberCurrent,
+      mbReportAutoIncrement,
+      elReportNumberBase,
+      elReportNumberCurrent,
+      elReportAutoIncrement
     } = req.body;
     
     const [result] = await db.query(
@@ -605,6 +615,15 @@ exports.updatePayrollSettings = async (req, res) => {
         private_duty_nurse_day_weekend = COALESCE(?, private_duty_nurse_day_weekend),
         private_duty_nurse_day_start = COALESCE(?, private_duty_nurse_day_start),
         private_duty_nurse_day_end = COALESCE(?, private_duty_nurse_day_end),
+        ss_report_number_base = COALESCE(?, ss_report_number_base),
+        ss_report_number_current = COALESCE(?, ss_report_number_current),
+        ss_report_auto_increment = COALESCE(?, ss_report_auto_increment),
+        mb_report_number_base = COALESCE(?, mb_report_number_base),
+        mb_report_number_current = COALESCE(?, mb_report_number_current),
+        mb_report_auto_increment = COALESCE(?, mb_report_auto_increment),
+        el_report_number_base = COALESCE(?, el_report_number_base),
+        el_report_number_current = COALESCE(?, el_report_number_current),
+        el_report_auto_increment = COALESCE(?, el_report_auto_increment),
         updated_at = CURRENT_TIMESTAMP
        WHERE id = 1`,
       [
@@ -625,7 +644,16 @@ exports.updatePayrollSettings = async (req, res) => {
         privateDutyNurseNightAll,
         privateDutyNurseDayWeekend,
         privateDutyNurseDayStart,
-        privateDutyNurseDayEnd
+        privateDutyNurseDayEnd,
+        ssReportNumberBase,
+        ssReportNumberCurrent,
+        ssReportAutoIncrement,
+        mbReportNumberBase,
+        mbReportNumberCurrent,
+        mbReportAutoIncrement,
+        elReportNumberBase,
+        elReportNumberCurrent,
+        elReportAutoIncrement
       ]
     );
     

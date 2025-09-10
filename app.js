@@ -13,6 +13,7 @@ const loanRoutes = require('./routes/loanRoutes');
 const vacationRoutes = require('./routes/vacationRoutes');
 const holidayRoutes = require('./routes/holidayRoutes');
 const departmentRoutes = require('./routes/departmentRoutes');
+const governmentReportRoutes = require('./routes/governmentReportRoutes');
 
 // Load environment variables
 dotenv.config();
@@ -38,6 +39,7 @@ app.use('/api/payroll', payrollRoutes);
 app.use('/api/vacations', vacationRoutes);
 app.use('/api/holidays', holidayRoutes);
 app.use('/api/departments', departmentRoutes);
+app.use('/api/reports/government', governmentReportRoutes);
 
 // Health check route
 app.get('/api/health', (req, res) => {
