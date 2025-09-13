@@ -126,8 +126,9 @@ exports.addEmployee = async (req, res) => {
     `INSERT INTO employees 
     (id, user_id, first_name, last_name, date_of_birth, gender, address, phone, email,
       hire_date, job_title, employee_type, department_id, salary_amount, hourly_rate, standard_hours, payment_frequency, 
-      is_exempt_ss, is_exempt_medical, date_of_birth_for_age, status, social_security_no, medical_benefits_no) 
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      is_exempt_ss, is_exempt_medical, date_of_birth_for_age, status, social_security_no, medical_benefits_no,
+      city, country) 
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       employee_id,
       userId, 
@@ -151,7 +152,9 @@ exports.addEmployee = async (req, res) => {
       dateOfBirthForAge,
       'active', // Default status
       social_security_no || null,
-      medical_benefits_no || null
+      medical_benefits_no || null,
+      city || null,
+      country || null
     ]
   );
     
@@ -337,7 +340,9 @@ exports.updateEmployee = async (req, res) => {
     is_exempt_medical,
     status,
     social_security_no,
-    medical_benefits_no
+    medical_benefits_no,
+    city,
+    country
   } = req.body;
   
   try {
@@ -421,7 +426,8 @@ exports.updateEmployee = async (req, res) => {
            employee_type = ?, department_id = ?, 
            salary_amount = ?, hourly_rate = ?, standard_hours = ?,
            payment_frequency = ?, is_exempt_ss = ?, is_exempt_medical = ?,
-           status = ?, date_of_birth_for_age = ?, social_security_no = ?, medical_benefits_no = ?
+           status = ?, date_of_birth_for_age = ?, social_security_no = ?, medical_benefits_no = ?,
+           city = ?, country = ?
        WHERE id = ?`,
       [
         first_name || employee[0].first_name, 
@@ -445,6 +451,8 @@ exports.updateEmployee = async (req, res) => {
         dateOfBirthForAge,
         social_security_no !== undefined ? social_security_no : employee[0].social_security_no,
         medical_benefits_no !== undefined ? medical_benefits_no : employee[0].medical_benefits_no,
+        city !== undefined ? city : employee[0].city,
+        country !== undefined ? country : employee[0].country,
         req.params.id
       ]
     );

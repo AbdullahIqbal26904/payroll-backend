@@ -767,13 +767,15 @@ exports.getACHReport = async (req, res) => {
     // If CSV format is requested, convert the data to CSV format
     if (format === 'csv') {
       // Create CSV content according to the specified format
-      // [A: Routing Number] [B: Account Number] [C: Saving/Checking] [D: Name] [E: Institute] [F: Amount] [G: Credit]
-      let csvContent = 'Routing Number,Account Number,Saving/Checking,Name,Institute,Amount,Credit\n';
+      // [A: Routing Number] [B: Account Number] [C: Ck/Sv] [D: Name] [E: City, Country] [F: Amount] [G: Credit]
+      // Note: Headers are removed as per client's request
+      let csvContent = '';
       
       // Add data rows only for entries with valid banking information
       achReportData.items.forEach(item => {
         if (item.has_banking_info) {
-          csvContent += `${item.routing_number},${item.account_number},${item.account_type},${item.employee_name},${item.bank_name},${item.amount},Cr\n`;
+          // Use the institute field which is formatted as "City, Country"
+          csvContent += `${item.routing_number},${item.account_number},${item.account_type},${item.employee_name},${item.institute},${item.amount},Cr\n`;
         }
       });
       

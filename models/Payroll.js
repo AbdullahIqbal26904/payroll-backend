@@ -1203,7 +1203,7 @@ class Payroll {
         throw new Error('Payroll run not found or not in a completed state');
       }
       
-      // Get payroll items with employee banking information
+      // Get payroll items with employee banking information, including city and country
       const [achData] = await db.query(
         `SELECT 
           pi.id as payroll_item_id,
@@ -1214,7 +1214,9 @@ class Payroll {
           ebi.account_type,
           ebi.account_number_encrypted,
           ebi.routing_number_encrypted,
-          ebi.direct_deposit_enabled
+          ebi.direct_deposit_enabled,
+          e.city,
+          e.country
         FROM 
           payroll_items pi
         JOIN 
@@ -1248,6 +1250,7 @@ class Payroll {
             account_type: null,
             routing_number: null,
             account_number: null,
+            institute: null,
             has_banking_info: false
           });
           continue;
@@ -1258,15 +1261,29 @@ class Payroll {
           const accountNumber = decrypt(item.account_number_encrypted);
           const routingNumber = decrypt(item.routing_number_encrypted);
           
+          // Convert account type to shortened format (Ck/Sv) as requested
+          let shortAccountType = item.account_type;
+          if (item.account_type === 'Checking') {
+            shortAccountType = 'Ck';
+          } else if (item.account_type === 'Savings') {
+            shortAccountType = 'Sv';
+          }
+          
+          // Format institute as "City, Country"
+          const city = item.city || '';
+          const country = item.country || '';
+          const institute = (city && country) ? `${city}, ${country}` : (city || country || item.bank_name);
+          
           processedData.push({
             payroll_item_id: item.payroll_item_id,
             employee_id: item.employee_id,
             employee_name: item.employee_name,
             amount: parseFloat(item.net_pay).toFixed(2),
             bank_name: item.bank_name,
-            account_type: item.account_type,
+            account_type: shortAccountType,
             routing_number: routingNumber,
             account_number: accountNumber,
+            institute: institute,
             has_banking_info: true
           });
           
@@ -1282,6 +1299,7 @@ class Payroll {
             account_type: null,
             routing_number: null,
             account_number: null,
+            institute: null,
             has_banking_info: false,
             error: 'Failed to decrypt banking information'
           });

@@ -6,15 +6,15 @@ The ACH (Automated Clearing House) reporting system allows administrators to gen
 
 ## ACH Report Format
 
-The ACH report follows this structure:
+The ACH report follows this structure (without column headers in the CSV):
 
 1. **Routing Number** - The bank routing number for the employee's account
 2. **Account Number** - The employee's bank account number
-3. **Account Type** - Whether the account is "Checking" or "Savings"
+3. **Account Type** - Expressed as "Ck" for Checking or "Sv" for Savings
 4. **Name** - The employee's full name
-5. **Institute** - The name of the financial institution
+5. **Institute** - Formatted as "City, Country" (e.g. St. John's, Antigua)
 6. **Amount** - The net pay amount to be deposited
-7. **Credit** - Indicator that this is a credit transaction
+7. **Credit** - Indicator that this is a credit transaction (always "Cr")
 
 ## API Endpoint
 
