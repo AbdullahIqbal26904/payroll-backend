@@ -53,6 +53,12 @@ Created new table `employee_banking_info` with:
 - Primary account designation
 - Audit fields for tracking changes
 
+## ACH Logic Business Rules
+1. **Single Primary Account**: Only one bank account per employee can be designated as primary
+2. **Single Direct Deposit Account**: Only one bank account per employee can have direct deposit enabled
+3. **Automatic Updates**: When setting an account as primary or direct deposit enabled, all other accounts are automatically updated accordingly
+4. **Auto-Promotion**: When deleting a primary account, another account is automatically promoted to primary if available
+
 ## Security Features
 1. **Data Encryption**: AES-256-CBC for account/routing numbers
 2. **Data Masking**: Only last few digits shown in API responses

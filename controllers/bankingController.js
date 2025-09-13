@@ -51,6 +51,24 @@ exports.addBankingInfo = async (req, res) => {
         message: 'Invalid routing number format'
       });
     }
+    
+    // Check existing bank accounts to validate business rules
+    const [existingAccounts] = await db.query(
+      'SELECT COUNT(*) as count, SUM(is_primary) as primary_count, SUM(direct_deposit_enabled) as direct_deposit_count FROM employee_banking_info WHERE employee_id = ?',
+      [req.params.id]
+    );
+    
+    // If adding a primary account but one already exists
+    if (is_primary && existingAccounts[0].primary_count > 0 && is_primary !== undefined) {
+      // This is ok, we'll update the existing primary account in the next step
+      console.log('Found existing primary account. Will be updated.');
+    }
+    
+    // If adding a direct deposit account but one already exists
+    if (direct_deposit_enabled && existingAccounts[0].direct_deposit_count > 0 && direct_deposit_enabled !== undefined) {
+      // This is ok, we'll update the existing direct deposit account in the next step
+      console.log('Found existing direct deposit account. Will be updated.');
+    }
 
     // Encrypt sensitive data
     const encryptedAccountNumber = encrypt(account_number);
@@ -60,6 +78,14 @@ exports.addBankingInfo = async (req, res) => {
     if (is_primary) {
       await db.query(
         'UPDATE employee_banking_info SET is_primary = FALSE WHERE employee_id = ?',
+        [req.params.id]
+      );
+    }
+    
+    // If direct deposit is enabled, update all other accounts to disable direct deposit
+    if (direct_deposit_enabled) {
+      await db.query(
+        'UPDATE employee_banking_info SET direct_deposit_enabled = FALSE WHERE employee_id = ?',
         [req.params.id]
       );
     }
@@ -258,6 +284,24 @@ exports.updateBankingInfo = async (req, res) => {
         message: 'Banking information not found'
       });
     }
+    
+    // Check existing bank accounts to validate business rules
+    const [existingAccounts] = await db.query(
+      'SELECT COUNT(*) as count, SUM(is_primary) as primary_count, SUM(direct_deposit_enabled) as direct_deposit_count FROM employee_banking_info WHERE employee_id = ? AND id != ?',
+      [req.params.id, req.params.bankingId]
+    );
+    
+    // If updating to primary but another primary account already exists
+    if (is_primary === true && existingAccounts[0].primary_count > 0) {
+      // This is ok, we'll update the existing primary accounts in the next step
+      console.log('Found existing primary accounts. Will be updated.');
+    }
+    
+    // If enabling direct deposit but another direct deposit account already exists
+    if (direct_deposit_enabled === true && existingAccounts[0].direct_deposit_count > 0) {
+      // This is ok, we'll update the existing direct deposit accounts in the next step
+      console.log('Found existing direct deposit accounts. Will be updated.');
+    }
 
     // Prepare update data
     const updateData = {};
@@ -336,6 +380,14 @@ exports.updateBankingInfo = async (req, res) => {
     if (is_primary) {
       await db.query(
         'UPDATE employee_banking_info SET is_primary = FALSE WHERE employee_id = ? AND id != ?',
+        [req.params.id, req.params.bankingId]
+      );
+    }
+    
+    // If direct deposit is being enabled, disable direct deposit for all other accounts
+    if (direct_deposit_enabled === true) {
+      await db.query(
+        'UPDATE employee_banking_info SET direct_deposit_enabled = FALSE WHERE employee_id = ? AND id != ?',
         [req.params.id, req.params.bankingId]
       );
     }

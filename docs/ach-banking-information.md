@@ -113,8 +113,12 @@ CREATE TABLE employee_banking_info (
 5. **Audit Logging**: Changes to banking information are logged in the audit trail
 
 6. **Primary Account Management**: System ensures only one account per employee is marked as primary
+   - When adding or updating an account as primary, all other accounts are automatically set to non-primary
 
-7. **Encryption Key Security**: Key is stored as an environment variable, not in code
+7. **Direct Deposit Management**: System ensures only one account per employee has direct deposit enabled
+   - When adding or updating an account with direct deposit enabled, all other accounts automatically have direct deposit disabled
+
+8. **Encryption Key Security**: Key is stored as an environment variable, not in code
 
 ## Environment Variables
 

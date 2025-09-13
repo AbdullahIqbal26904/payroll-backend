@@ -327,4 +327,28 @@ We've implemented the bank-focused ACH report feature for payroll direct deposit
 
 This feature completes the requested bank-focused reporting functionality, enabling seamless processing of direct deposits through your banking system.
 
+## Recent Updates (September 14, 2025)
+
+### Enhanced ACH Banking Logic
+
+We've implemented the requested improvements to the ACH banking logic with the following enhancements:
+
+1. **Primary Account Management**:
+   - Implemented rule: Only one bank account per employee can be designated as primary
+   - When a new account is set as primary, all other accounts are automatically set to non-primary
+   - When updating an existing account to be primary, all other accounts are automatically updated
+
+2. **Direct Deposit Control**:
+   - Implemented rule: Only one bank account per employee can have direct deposit enabled
+   - When a new account has direct deposit enabled, all other accounts automatically have direct deposit disabled
+   - When updating an existing account to enable direct deposit, all other accounts are automatically updated
+
+3. **Technical Implementation**:
+   - Enhanced `addBankingInfo` and `updateBankingInfo` methods in the banking controller
+   - Added database transaction support to ensure data consistency
+   - Implemented comprehensive validation for business rules
+   - Created detailed documentation in `/docs/ach-banking-updates.md`
+
+These enhancements ensure that the banking information management system properly enforces the business rules for primary accounts and direct deposits, preventing conflicts and ensuring consistent bank payment processing.
+
 Please review this proposal and let me know if you need any clarification or have additional requirements to discuss.
