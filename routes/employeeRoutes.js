@@ -4,7 +4,8 @@ const {
   getEmployees,
   getEmployee,
   updateEmployee,
-  deleteEmployee
+  deleteEmployee,
+  toggleArchiveEmployee
 } = require('../controllers/employeeController');
 const { getEmployeeLoans } = require('../controllers/loanController');
 const { protect, authorize, auditLogger } = require('../middlewares/auth');
@@ -33,6 +34,9 @@ router
 
 // Route for getting employee loans
 router.route('/:id/loans').get(getEmployeeLoans);
+
+// Route for archiving/unarchiving an employee
+router.route('/:id/archive').patch(toggleArchiveEmployee);
 
 // Mount banking routes
 router.use('/:id/banking', bankingRoutes);

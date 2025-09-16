@@ -234,6 +234,22 @@ exports.getEmployees = async (req, res) => {
       queryParams.push(req.query.department_id);
     }
     
+    // Add status filter (active/archived)
+    if (req.query.status) {
+      // If status is 'all', don't add any filter
+      if (req.query.status.toLowerCase() !== 'all') {
+        const whereClause = (req.query.search || req.query.department_id) ? 'AND' : 'WHERE';
+        query += ` ${whereClause} e.status = ?`;
+        countQuery += ` ${whereClause} e.status = ?`;
+        queryParams.push(req.query.status);
+      }
+    } else {
+      // Default to showing only active employees unless explicitly requested
+      const whereClause = (req.query.search || req.query.department_id) ? 'AND' : 'WHERE';
+      query += ` ${whereClause} e.status = 'active'`;
+      countQuery += ` ${whereClause} e.status = 'active'`;
+    }
+    
     // Add sorting and pagination
     query += ` ORDER BY ${sortBy === 'department' ? 'd.name' : 'e.' + sortBy} ${sortOrder} LIMIT ? OFFSET ?`;
     queryParams.push(limit, offset);
@@ -245,6 +261,10 @@ exports.getEmployees = async (req, res) => {
     let countQueryParams = req.query.search ? queryParams.slice(0, 5) : [];
     if (req.query.department_id) {
       countQueryParams.push(req.query.department_id);
+    }
+    // Add status parameter to count query if provided
+    if (req.query.status && req.query.status.toLowerCase() !== 'all') {
+      countQueryParams.push(req.query.status);
     }
     const [countResult] = await db.query(countQuery, countQueryParams);
     const total = countResult[0].total;
@@ -529,6 +549,65 @@ exports.deleteEmployee = async (req, res) => {
     await db.query('COMMIT');
     
     res.status(200).json(formatSuccess('Employee deleted successfully'));
+  } catch (error) {
+    // Rollback transaction on error
+    await db.query('ROLLBACK');
+    res.status(500).json(formatError(error));
+  }
+};
+
+/**
+ * @desc    Archive or unarchive employee
+ * @route   PATCH /api/employees/:id/archive
+ * @access  Private/Admin
+ */
+exports.toggleArchiveEmployee = async (req, res) => {
+  try {
+    const { action } = req.body; // 'archive' or 'unarchive'
+    
+    if (!action || (action !== 'archive' && action !== 'unarchive')) {
+      return res.status(400).json({
+        success: false,
+        message: "Action must be either 'archive' or 'unarchive'"
+      });
+    }
+    
+    // Start transaction
+    await db.query('START TRANSACTION');
+    
+    // Check if employee exists
+    const [employee] = await db.query(
+      'SELECT * FROM employees WHERE id = ?',
+      [req.params.id]
+    );
+    
+    if (employee.length === 0) {
+      await db.query('ROLLBACK');
+      return res.status(404).json({
+        success: false,
+        message: 'Employee not found'
+      });
+    }
+    
+    // Set status based on action
+    const newStatus = action === 'archive' ? 'archived' : 'active';
+    
+    // Update employee status
+    await db.query(
+      'UPDATE employees SET status = ? WHERE id = ?',
+      [newStatus, req.params.id]
+    );
+    
+    // Commit transaction
+    await db.query('COMMIT');
+    
+    // Get updated employee
+    const [updatedEmployee] = await db.query(
+      'SELECT * FROM employees WHERE id = ?',
+      [req.params.id]
+    );
+    
+    res.status(200).json(formatSuccess(`Employee ${action}d successfully`, updatedEmployee[0]));
   } catch (error) {
     // Rollback transaction on error
     await db.query('ROLLBACK');

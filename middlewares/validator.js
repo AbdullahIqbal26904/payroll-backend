@@ -34,7 +34,7 @@ exports.employeeValidation = [
   check('is_exempt_ss', 'Social Security exemption must be a boolean').optional().isBoolean(),
   check('is_exempt_medical', 'Medical benefits exemption must be a boolean').optional().isBoolean(),
   check('department_id', 'Department ID is required').not().isEmpty().isNumeric(),
-  check('status', 'Status must be active or inactive').optional().isIn(['active', 'inactive'])
+  check('status', 'Status must be active, inactive, or archived').optional().isIn(['active', 'inactive', 'archived'])
 ];
 
 // Validation for employee update (less strict than creation)
