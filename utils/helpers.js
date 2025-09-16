@@ -65,3 +65,50 @@ exports.formatSuccess = (message, data = null) => {
     data
   };
 };
+
+/**
+ * Calculate working days between two dates
+ * @param {string|Date} startDate - Start date
+ * @param {string|Date} endDate - End date
+ * @returns {number} Number of working days (excluding weekends)
+ */
+exports.calculateWorkingDays = (startDate, endDate) => {
+  // Convert to date objects
+  const start = new Date(startDate);
+  const end = new Date(endDate);
+  
+  // Check if dates are valid
+  if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+    return 0;
+  }
+  
+  // Clone the start date
+  const current = new Date(start);
+  let workingDays = 0;
+  
+  // Loop through each day and count if it's a weekday (Monday-Friday)
+  while (current <= end) {
+    const dayOfWeek = current.getDay();
+    // 0 is Sunday, 6 is Saturday
+    if (dayOfWeek !== 0 && dayOfWeek !== 6) {
+      workingDays++;
+    }
+    
+    // Move to the next day
+    current.setDate(current.getDate() + 1);
+  }
+  
+  return workingDays;
+};
+
+/**
+ * Calculate vacation hours based on working days and standard hours
+ * @param {string|Date} startDate - Start date
+ * @param {string|Date} endDate - End date
+ * @param {number} standardDailyHours - Standard daily hours (default: 8)
+ * @returns {number} Total vacation hours
+ */
+exports.calculateVacationHours = (startDate, endDate, standardDailyHours = 8) => {
+  const workingDays = exports.calculateWorkingDays(startDate, endDate);
+  return workingDays * standardDailyHours;
+};

@@ -10,14 +10,14 @@ exports.createVacation = async (req, res) => {
   try {
     const { employee_id, start_date, end_date, total_hours, hourly_rate, status } = req.body;
     
-    // Validation
-    if (!employee_id || !start_date || !end_date || !total_hours) {
+    // Validation - only employee_id, start_date, and end_date are required now
+    if (!employee_id || !start_date || !end_date) {
       return res.status(400).json(
-        formatError('Missing required fields: employee_id, start_date, end_date, total_hours')
+        formatError('Missing required fields: employee_id, start_date, end_date')
       );
     }
     
-    // Create vacation entry
+    // Create vacation entry - total_hours and hourly_rate will be automatically calculated if not provided
     const vacation = await EmployeeVacation.create(
       { employee_id, start_date, end_date, total_hours, hourly_rate, status },
       req.user.id
@@ -47,6 +47,7 @@ exports.updateVacation = async (req, res) => {
     }
     
     // Update vacation
+    // Note: If date range changes but total_hours not provided, hours will be recalculated automatically
     const vacation = await EmployeeVacation.update(id, {
       start_date, end_date, total_hours, hourly_rate, status
     });

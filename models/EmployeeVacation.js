@@ -19,6 +19,37 @@ class EmployeeVacation {
       try {
         await connection.beginTransaction();
         
+        // Get employee details to use their hourly rate and calculate vacation hours
+        const [employeeRows] = await connection.query(
+          `SELECT id, hourly_rate, employee_type, standard_hours 
+           FROM employees 
+           WHERE id = ?`,
+          [vacationData.employee_id]
+        );
+        
+        if (employeeRows.length === 0) {
+          throw new Error('Employee not found');
+        }
+        
+        const employee = employeeRows[0];
+        const formattedStartDate = helpers.formatDate(vacationData.start_date);
+        const formattedEndDate = helpers.formatDate(vacationData.end_date);
+        
+        // Calculate vacation hours based on working days if not provided
+        let totalHours = vacationData.total_hours;
+        if (!totalHours) {
+          // Calculate standard daily hours (standard_hours / 5) or default to 8
+          const standardDailyHours = employee.standard_hours ? employee.standard_hours / 5 : 8;
+          totalHours = helpers.calculateVacationHours(
+            formattedStartDate, 
+            formattedEndDate, 
+            standardDailyHours
+          );
+        }
+        
+        // Use employee's hourly rate if not provided
+        const hourlyRate = vacationData.hourly_rate || employee.hourly_rate;
+        
         // Insert vacation entry
         const [result] = await connection.query(
           `INSERT INTO employee_vacations 
@@ -26,10 +57,10 @@ class EmployeeVacation {
            VALUES (?, ?, ?, ?, ?, ?, ?)`,
           [
             vacationData.employee_id, 
-            helpers.formatDate(vacationData.start_date), 
-            helpers.formatDate(vacationData.end_date),
-            vacationData.total_hours,
-            vacationData.hourly_rate || null,
+            formattedStartDate, 
+            formattedEndDate,
+            totalHours,
+            hourlyRate,
             vacationData.status || 'pending',
             userId
           ]
@@ -72,28 +103,76 @@ class EmployeeVacation {
       try {
         await connection.beginTransaction();
         
-        // Update fields
+        // Get current vacation data
+        const [currentVacation] = await connection.query(
+          `SELECT * FROM employee_vacations WHERE id = ?`,
+          [id]
+        );
+        
+        if (currentVacation.length === 0) {
+          throw new Error('Vacation entry not found');
+        }
+        
+        // Get employee data
+        const [employeeRows] = await connection.query(
+          `SELECT id, hourly_rate, employee_type, standard_hours 
+           FROM employees 
+           WHERE id = ?`,
+          [currentVacation[0].employee_id]
+        );
+        
+        if (employeeRows.length === 0) {
+          throw new Error('Employee not found');
+        }
+        
+        const employee = employeeRows[0];
+        
+        // Prepare update fields
         const updateFields = [];
         const updateValues = [];
         
+        // Format dates if provided
+        let startDate = currentVacation[0].start_date;
+        let endDate = currentVacation[0].end_date;
+        
         if (vacationData.start_date) {
+          startDate = helpers.formatDate(vacationData.start_date);
           updateFields.push('start_date = ?');
-          updateValues.push(helpers.formatDate(vacationData.start_date));
+          updateValues.push(startDate);
         }
         
         if (vacationData.end_date) {
+          endDate = helpers.formatDate(vacationData.end_date);
           updateFields.push('end_date = ?');
-          updateValues.push(helpers.formatDate(vacationData.end_date));
+          updateValues.push(endDate);
         }
         
-        if (vacationData.total_hours !== undefined) {
+        // If dates changed but total_hours not provided, recalculate
+        if ((vacationData.start_date || vacationData.end_date) && vacationData.total_hours === undefined) {
+          // Calculate standard daily hours (standard_hours / 5) or default to 8
+          const standardDailyHours = employee.standard_hours ? employee.standard_hours / 5 : 8;
+          
+          const calculatedHours = helpers.calculateVacationHours(
+            startDate, 
+            endDate, 
+            standardDailyHours
+          );
+          
+          updateFields.push('total_hours = ?');
+          updateValues.push(calculatedHours);
+        } else if (vacationData.total_hours !== undefined) {
           updateFields.push('total_hours = ?');
           updateValues.push(vacationData.total_hours);
         }
         
+        // Use employee's hourly rate if not provided
         if (vacationData.hourly_rate !== undefined) {
           updateFields.push('hourly_rate = ?');
           updateValues.push(vacationData.hourly_rate);
+        } else if (!currentVacation[0].hourly_rate) {
+          // If the current hourly_rate is null and none provided, use employee's
+          updateFields.push('hourly_rate = ?');
+          updateValues.push(employee.hourly_rate);
         }
         
         if (vacationData.status) {
