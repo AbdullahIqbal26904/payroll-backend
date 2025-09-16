@@ -14,6 +14,7 @@ const vacationRoutes = require('./routes/vacationRoutes');
 const holidayRoutes = require('./routes/holidayRoutes');
 const departmentRoutes = require('./routes/departmentRoutes');
 const governmentReportRoutes = require('./routes/governmentReportRoutes');
+const auditRoutes = require('./routes/auditRoutes');
 
 // Load environment variables
 dotenv.config();
@@ -29,6 +30,9 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true
 }));
+
+// Import and use audit middleware
+const { auditRequest } = require('./middlewares/audit');
 
 // Additional CORS headers for preflight requests
 app.use((req, res, next) => {
@@ -48,6 +52,9 @@ app.use((req, res, next) => {
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// Apply audit logging middleware
+app.use(auditRequest);
+
 // Static files - for uploads and public assets
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
@@ -61,6 +68,7 @@ app.use('/api/vacations', vacationRoutes);
 app.use('/api/holidays', holidayRoutes);
 app.use('/api/departments', departmentRoutes);
 app.use('/api/reports/government', governmentReportRoutes);
+app.use('/api/audit', auditRoutes);
 
 // Health check route
 app.get('/api/health', (req, res) => {
