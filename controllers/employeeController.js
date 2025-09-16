@@ -29,6 +29,8 @@ exports.addEmployee = async (req, res) => {
     is_exempt_medical,
     social_security_no,
     medical_benefits_no,
+    city,
+    country
   } = req.body;
   
   try {

@@ -144,12 +144,51 @@ class EmployeeLoan {
         }
       }
       
+      // Get employee payment frequency if not calculating expected end date
+      let employeePaymentFrequency;
+      if (!loanData.expected_end_date) {
+        const [employeeResult] = await connection.query(
+          `SELECT payment_frequency FROM employees WHERE id = ?`,
+          [loanData.employee_id]
+        );
+        
+        if (employeeResult.length === 0) {
+          throw new Error('Employee not found');
+        }
+        
+        employeePaymentFrequency = employeeResult[0].payment_frequency;
+      }
+      
       // Calculate total amount with interest
       const principal = parseFloat(loanData.loan_amount);
       const interestRate = parseFloat(loanData.interest_rate || 0);
-      const years = this.calculateLoanTermInYears(loanData.start_date, loanData.expected_end_date);
-      const interestAmount = principal * (interestRate / 100) * years;
-      const totalAmount = principal + interestAmount;
+      
+      let years, interestAmount, totalAmount, expected_end_date;
+      
+      if (loanData.expected_end_date) {
+        // If expected_end_date is provided, calculate interest based on term
+        years = this.calculateLoanTermInYears(loanData.start_date, loanData.expected_end_date);
+        interestAmount = principal * (interestRate / 100) * years;
+        totalAmount = principal + interestAmount;
+        expected_end_date = loanData.expected_end_date;
+      } else {
+        // Calculate a temporary total amount
+        interestAmount = principal * (interestRate / 100);
+        totalAmount = principal + interestAmount;
+        
+        // Calculate expected end date based on installment amount and payment frequency
+        expected_end_date = this.calculateExpectedEndDate(
+          totalAmount,
+          parseFloat(loanData.installment_amount),
+          loanData.start_date,
+          employeePaymentFrequency
+        ).toISOString().split('T')[0]; // Format as YYYY-MM-DD
+        
+        // Now recalculate the interest with the proper term
+        years = this.calculateLoanTermInYears(loanData.start_date, expected_end_date);
+        interestAmount = principal * (interestRate / 100) * years;
+        totalAmount = principal + interestAmount;
+      }
       
       // Insert the new loan
       const [result] = await connection.query(
@@ -167,7 +206,7 @@ class EmployeeLoan {
           totalAmount, // Initially, remaining amount equals total amount
           loanData.installment_amount,
           loanData.start_date,
-          loanData.expected_end_date,
+          expected_end_date,
           loanData.status || 'active',
           loanData.notes || null,
           loanData.loan_type || LOAN_TYPE.INTERNAL,
@@ -394,6 +433,45 @@ class EmployeeLoan {
     const diffTime = Math.abs(end - start);
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
     return diffDays / 365;
+  }
+  
+  /**
+   * Calculate the expected end date for a loan
+   * @param {number} totalAmount - Total loan amount including interest
+   * @param {number} installmentAmount - Amount deducted per pay period
+   * @param {Date|string} startDate - Loan start date
+   * @param {string} paymentFrequency - Employee payment frequency (weekly, bi-weekly, monthly)
+   * @returns {Date} Expected end date
+   */
+  static calculateExpectedEndDate(totalAmount, installmentAmount, startDate, paymentFrequency) {
+    // Calculate number of installments
+    const numberOfInstallments = Math.ceil(totalAmount / installmentAmount);
+    
+    // Calculate days per installment based on payment frequency
+    let daysPerPaymentCycle;
+    switch(paymentFrequency) {
+      case 'weekly':
+        daysPerPaymentCycle = 7;
+        break;
+      case 'bi-weekly':
+        daysPerPaymentCycle = 14;
+        break;
+      case 'monthly':
+        daysPerPaymentCycle = 30; // Approximate
+        break;
+      default:
+        daysPerPaymentCycle = 30; // Default to monthly if unknown
+    }
+    
+    // Calculate total days to repay
+    const totalDaysToRepay = numberOfInstallments * daysPerPaymentCycle;
+    
+    // Calculate end date
+    const startDateObj = new Date(startDate);
+    const endDateObj = new Date(startDateObj);
+    endDateObj.setDate(startDateObj.getDate() + totalDaysToRepay);
+    
+    return endDateObj;
   }
   
   /**

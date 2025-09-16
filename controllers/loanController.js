@@ -77,7 +77,7 @@ exports.createLoan = async (req, res) => {
     } = req.body;
     
     // Validate required fields
-    if (!employee_id || !loan_amount || !installment_amount || !start_date || !expected_end_date) {
+    if (!employee_id || !loan_amount || !installment_amount || !start_date) {
       return res.status(400).json({
         success: false,
         message: 'Missing required fields'
@@ -208,7 +208,7 @@ exports.createThirdPartyLoan = async (req, res) => {
     
     // Validate required fields
     if (!employee_id || !loan_amount || !installment_amount || !start_date || 
-        !expected_end_date || !third_party_name) {
+        !third_party_name) {
       return res.status(400).json({
         success: false,
         message: 'Missing required fields for third-party loan'
