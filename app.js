@@ -16,6 +16,7 @@ const holidayRoutes = require('./routes/holidayRoutes');
 const departmentRoutes = require('./routes/departmentRoutes');
 const governmentReportRoutes = require('./routes/governmentReportRoutes');
 const auditRoutes = require('./routes/auditRoutes');
+const analyticsRoutes = require('./routes/analyticsRoutes');
 
 // Load environment variables
 dotenv.config();
@@ -71,6 +72,7 @@ app.use('/api/holidays', holidayRoutes);
 app.use('/api/departments', departmentRoutes);
 app.use('/api/reports/government', governmentReportRoutes);
 app.use('/api/audit', auditRoutes);
+app.use('/api/analytics', analyticsRoutes);
 
 // Health check route
 app.get('/api/health', (req, res) => {
