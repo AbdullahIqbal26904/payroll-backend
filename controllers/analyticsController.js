@@ -34,8 +34,8 @@ class AnalyticsController {
       
       switch (timeframe) {
         case 'weekly':
-          groupByClause = 'YEARWEEK(tp.period_end, 3)';
-          selectTimeframe = `CONCAT(YEAR(tp.period_end), '-W', WEEK(tp.period_end)) as time_period`;
+          groupByClause = `CONCAT(YEAR(tp.period_end), '-W', LPAD(WEEK(tp.period_end, 3), 2, '0'))`;
+          selectTimeframe = `CONCAT(YEAR(tp.period_end), '-W', LPAD(WEEK(tp.period_end, 3), 2, '0')) as time_period`;
           break;
         case 'quarterly':
           groupByClause = 'CONCAT(YEAR(tp.period_end), "-Q", QUARTER(tp.period_end))';
@@ -299,8 +299,8 @@ class AnalyticsController {
       
       switch (timeframe) {
         case 'weekly':
-          groupByClause = 'YEARWEEK(tp.period_end, 3)';
-          selectTimeframe = `CONCAT(YEAR(tp.period_end), '-W', WEEK(tp.period_end)) as time_period`;
+          groupByClause = `CONCAT(YEAR(tp.period_end), '-W', LPAD(WEEK(tp.period_end, 3), 2, '0'))`;
+          selectTimeframe = `CONCAT(YEAR(tp.period_end), '-W', LPAD(WEEK(tp.period_end, 3), 2, '0')) as time_period`;
           break;
         case 'quarterly':
           groupByClause = 'CONCAT(YEAR(tp.period_end), "-Q", QUARTER(tp.period_end))';
