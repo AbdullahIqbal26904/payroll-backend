@@ -306,7 +306,9 @@ class Payroll {
               
               // Group entries by date
               employeeInfo.entries.forEach(entry => {
-                const entryDate = new Date(entry.date).toDateString();
+                // timesheet_entries uses 'work_date' column
+                const dateValue = entry.work_date || entry.date;
+                const entryDate = new Date(dateValue).toDateString();
                 if (!dailyEntries[entryDate]) {
                   dailyEntries[entryDate] = { totalHours: 0, entries: [] };
                 }
