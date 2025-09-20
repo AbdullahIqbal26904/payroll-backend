@@ -444,8 +444,7 @@ const generateSocialSecurityPDF = async ({ payrollRunId, payrollRunData, reportN
       
       // Page dimensions
       const pageWidth = doc.page.width - 60;
-      const startX = 30;
-      const startY = 80; // Start Y position after headers
+      const startY = 100; // Start Y position after headers (increased to accommodate centered headers)
       
       // Format the date for the report (e.g. Jul-25)
       const payDate = new Date(payrollRunData.pay_date);
@@ -454,20 +453,27 @@ const generateSocialSecurityPDF = async ({ payrollRunId, payrollRunData, reportN
         year: '2-digit'
       });
       
-      // Add report header with proper formatting
+      // Add report header with centered formatting
       doc.fontSize(14).font('Helvetica-Bold')
-         .text('SOCIAL SECURITY CONTRIBUTIONS', { align: 'left' });
+         .text('SOCIAL SECURITY CONTRIBUTIONS', { align: 'center' });
       
       doc.fontSize(12).font('Helvetica-Bold')
-         .text(`EMPLOYER: MEDICAL SURGICAL ASSOCIATES                                 Reg.#${reportNumberDetails.formatted}`, { align: 'left' });
+         .text(`EMPLOYER: MEDICAL SURGICAL ASSOCIATES`, { align: 'center' });
+         
+      doc.fontSize(12).font('Helvetica-Bold')
+         .text(`Reg.#${reportNumberDetails.formatted}`, { align: 'center' });
 
       doc.moveDown(0.2);      
       doc.fontSize(12).font('Helvetica-Bold')
-         .text(`${monthYear}`, { align: 'left' });
+         .text(`${monthYear}`, { align: 'center' });
       
       // Define column structure to match the reference
       // No. | Employee | Sex | Earnings for month | Employee 7.00% | Employer 9.00% | 16.00% Contribution
-      const columnWidths = [90, 100, 30, 80, 80, 80, 80];
+      const columnWidths = [90, 110, 30, 80, 80, 80, 90];
+      
+      // Center the table on the page
+      const tableWidth = columnWidths.reduce((sum, width) => sum + width, 0);
+      const startX = (doc.page.width - tableWidth) / 2;
       
       // Calculate SS rates
       const employeeRate = settings.social_security_employee_rate;
@@ -475,7 +481,7 @@ const generateSocialSecurityPDF = async ({ payrollRunId, payrollRunData, reportN
       const totalRate = employeeRate + employerRate;
       
       // Create a border for the entire table
-      doc.rect(startX, startY, pageWidth, 30).stroke();
+      doc.rect(startX, startY, tableWidth, 30).stroke();
       
       // Draw table headers in multi-row format as per reference
       // First row
@@ -493,35 +499,35 @@ const generateSocialSecurityPDF = async ({ payrollRunId, payrollRunData, reportN
       doc.moveTo(startX, startY + 15).lineTo(startX + pageWidth, startY + 15).stroke();
       
       // First row headers
-      doc.text('No.', startX + 5, startY + 3, { width: columnWidths[0] });
-      doc.text('Employee', startX + columnWidths[0] + 5, startY + 3, { width: columnWidths[1] });
+      doc.text('No.', startX + 5, startY + 3, { width: columnWidths[0] - 10, align: 'center' });
+      doc.text('Employee', startX + columnWidths[0] + 5, startY + 3, { width: columnWidths[1] - 10, align: 'center' });
       
       // For "Employees" spanning two columns
       let employeesHeaderX = startX + columnWidths[0] + columnWidths[1] + 5;
-      doc.text('Employees', employeesHeaderX, startY + 3, { width: columnWidths[2] + columnWidths[3] });
+      doc.text('Employees', employeesHeaderX, startY + 3, { width: columnWidths[2] + columnWidths[3] - 10, align: 'center' });
       
       // Split columns for Employee/Employer
       doc.text('Employee', startX + columnWidths[0] + columnWidths[1] + columnWidths[2] + columnWidths[3] + 5, 
-               startY + 3, { width: columnWidths[4], align: 'center' });
+               startY + 3, { width: columnWidths[4] - 10, align: 'center' });
       doc.text('Employer', startX + columnWidths[0] + columnWidths[1] + columnWidths[2] + columnWidths[3] + columnWidths[4] + 5, 
-               startY + 3, { width: columnWidths[5], align: 'center' });
+               startY + 3, { width: columnWidths[5] - 10, align: 'center' });
       doc.text('16.00%', startX + columnWidths[0] + columnWidths[1] + columnWidths[2] + columnWidths[3] + 
-               columnWidths[4] + columnWidths[5] + 5, startY + 3, { width: columnWidths[6], align: 'center' });
+               columnWidths[4] + columnWidths[5] + 5, startY + 3, { width: columnWidths[6] - 10, align: 'center' });
       
       // Second row headers
-      doc.text('', startX + 5, startY + 18, { width: columnWidths[0] }); // No subheader for No.
-      doc.text('', startX + columnWidths[0] + 5, startY + 18, { width: columnWidths[1] }); // No subheader for Employee
-      doc.text('', startX + columnWidths[0] + columnWidths[1] + 5, startY + 18, { width: columnWidths[2] }); // Sex column
+      doc.text('', startX + 5, startY + 18, { width: columnWidths[0] - 10, align: 'center' }); // No subheader for No.
+      doc.text('', startX + columnWidths[0] + 5, startY + 18, { width: columnWidths[1] - 10, align: 'center' }); // No subheader for Employee
+      doc.text('', startX + columnWidths[0] + columnWidths[1] + 5, startY + 18, { width: columnWidths[2] - 10, align: 'center' }); // Sex column
       doc.text('Earnings', startX + columnWidths[0] + columnWidths[1] + columnWidths[2] + 5, 
-               startY + 18, { width: columnWidths[3], align: 'center' });
+               startY + 18, { width: columnWidths[3] - 10, align: 'center' });
       doc.text('for month', startX + columnWidths[0] + columnWidths[1] + columnWidths[2] + 5, 
-               startY + 24, { width: columnWidths[3], align: 'center' });
+               startY + 24, { width: columnWidths[3] - 10, align: 'center' });
       doc.text(`${employeeRate}.00%`, startX + columnWidths[0] + columnWidths[1] + columnWidths[2] + columnWidths[3] + 5, 
-               startY + 18, { width: columnWidths[4], align: 'center' });
+               startY + 18, { width: columnWidths[4] - 10, align: 'center' });
       doc.text(`${employerRate}.00%`, startX + columnWidths[0] + columnWidths[1] + columnWidths[2] + columnWidths[3] + columnWidths[4] + 5, 
-               startY + 18, { width: columnWidths[5], align: 'center' });
+               startY + 18, { width: columnWidths[5] - 10, align: 'center' });
       doc.text('Contribution', startX + columnWidths[0] + columnWidths[1] + columnWidths[2] + columnWidths[3] + 
-               columnWidths[4] + columnWidths[5] + 5, startY + 18, { width: columnWidths[6], align: 'center' });
+               columnWidths[4] + columnWidths[5] + 5, startY + 18, { width: columnWidths[6] - 10, align: 'center' });
       
       // Add data rows
       let currentY = startY + 30;
@@ -556,20 +562,23 @@ const generateSocialSecurityPDF = async ({ payrollRunId, payrollRunData, reportN
           
           // Format the date for the report (e.g. Jul-25) for continuation pages
           doc.fontSize(14).font('Helvetica-Bold')
-             .text('SOCIAL SECURITY CONTRIBUTIONS (Continued)', { align: 'left' });
+             .text('SOCIAL SECURITY CONTRIBUTIONS (Continued)', { align: 'center' });
           
           doc.fontSize(12).font('Helvetica-Bold')
-             .text(`EMPLOYER: MEDICAL SURGICAL ASSOCIATES                                 Reg.#${reportNumberDetails.formatted}`, { align: 'left' });
+             .text(`EMPLOYER: MEDICAL SURGICAL ASSOCIATES`, { align: 'center' });
+             
+          doc.fontSize(12).font('Helvetica-Bold')
+             .text(`Reg.#${reportNumberDetails.formatted}`, { align: 'center' });
     
           doc.moveDown(0.2);      
           doc.fontSize(12).font('Helvetica-Bold')
-             .text(`${monthYear}`, { align: 'left' });
+             .text(`${monthYear}`, { align: 'center' });
           
           // Move to where the table should start
-          currentY = 80;
+          currentY = 100;
           
           // Create a border for the entire table
-          doc.rect(startX, currentY, pageWidth, 30).stroke();
+          doc.rect(startX, currentY, tableWidth, 30).stroke();
           
           // Draw table headers in multi-row format as per reference
           // First row
@@ -587,35 +596,35 @@ const generateSocialSecurityPDF = async ({ payrollRunId, payrollRunData, reportN
           doc.moveTo(startX, currentY + 15).lineTo(startX + pageWidth, currentY + 15).stroke();
           
           // First row headers
-          doc.text('No.', startX + 5, currentY + 3, { width: columnWidths[0] });
-          doc.text('Employee', startX + columnWidths[0] + 5, currentY + 3, { width: columnWidths[1] });
+          doc.text('No.', startX + 5, currentY + 3, { width: columnWidths[0] - 10, align: 'center' });
+          doc.text('Employee', startX + columnWidths[0] + 5, currentY + 3, { width: columnWidths[1] - 10, align: 'center' });
           
           // For "Employees" spanning two columns
           let employeesHeaderX = startX + columnWidths[0] + columnWidths[1] + 5;
-          doc.text('Employees', employeesHeaderX, currentY + 3, { width: columnWidths[2] + columnWidths[3] });
+          doc.text('Employees', employeesHeaderX, currentY + 3, { width: columnWidths[2] + columnWidths[3] - 10, align: 'center' });
           
           // Split columns for Employee/Employer
           doc.text('Employee', startX + columnWidths[0] + columnWidths[1] + columnWidths[2] + columnWidths[3] + 5, 
-                   currentY + 3, { width: columnWidths[4], align: 'center' });
+                   currentY + 3, { width: columnWidths[4] - 10, align: 'center' });
           doc.text('Employer', startX + columnWidths[0] + columnWidths[1] + columnWidths[2] + columnWidths[3] + columnWidths[4] + 5, 
-                   currentY + 3, { width: columnWidths[5], align: 'center' });
+                   currentY + 3, { width: columnWidths[5] - 10, align: 'center' });
           doc.text('16.00%', startX + columnWidths[0] + columnWidths[1] + columnWidths[2] + columnWidths[3] + 
-                   columnWidths[4] + columnWidths[5] + 5, currentY + 3, { width: columnWidths[6], align: 'center' });
+                   columnWidths[4] + columnWidths[5] + 5, currentY + 3, { width: columnWidths[6] - 10, align: 'center' });
           
           // Second row headers
-          doc.text('', startX + 5, currentY + 18, { width: columnWidths[0] }); // No subheader for No.
-          doc.text('', startX + columnWidths[0] + 5, currentY + 18, { width: columnWidths[1] }); // No subheader for Employee
-          doc.text('', startX + columnWidths[0] + columnWidths[1] + 5, currentY + 18, { width: columnWidths[2] }); // Sex column
+          doc.text('', startX + 5, currentY + 18, { width: columnWidths[0] - 10, align: 'center' }); // No subheader for No.
+          doc.text('', startX + columnWidths[0] + 5, currentY + 18, { width: columnWidths[1] - 10, align: 'center' }); // No subheader for Employee
+          doc.text('', startX + columnWidths[0] + columnWidths[1] + 5, currentY + 18, { width: columnWidths[2] - 10, align: 'center' }); // Sex column
           doc.text('Earnings', startX + columnWidths[0] + columnWidths[1] + columnWidths[2] + 5, 
-                   currentY + 18, { width: columnWidths[3], align: 'center' });
+                   currentY + 18, { width: columnWidths[3] - 10, align: 'center' });
           doc.text('for month', startX + columnWidths[0] + columnWidths[1] + columnWidths[2] + 5, 
-                   currentY + 24, { width: columnWidths[3], align: 'center' });
+                   currentY + 24, { width: columnWidths[3] - 10, align: 'center' });
           doc.text(`${employeeRate}.00%`, startX + columnWidths[0] + columnWidths[1] + columnWidths[2] + columnWidths[3] + 5, 
-                   currentY + 18, { width: columnWidths[4], align: 'center' });
+                   currentY + 18, { width: columnWidths[4] - 10, align: 'center' });
           doc.text(`${employerRate}.00%`, startX + columnWidths[0] + columnWidths[1] + columnWidths[2] + columnWidths[3] + columnWidths[4] + 5, 
-                   currentY + 18, { width: columnWidths[5], align: 'center' });
+                   currentY + 18, { width: columnWidths[5] - 10, align: 'center' });
           doc.text('Contribution', startX + columnWidths[0] + columnWidths[1] + columnWidths[2] + columnWidths[3] + 
-                   columnWidths[4] + columnWidths[5] + 5, currentY + 18, { width: columnWidths[6], align: 'center' });
+                   columnWidths[4] + columnWidths[5] + 5, currentY + 18, { width: columnWidths[6] - 10, align: 'center' });
           
           currentY += 30;
         }
@@ -623,6 +632,9 @@ const generateSocialSecurityPDF = async ({ payrollRunId, payrollRunData, reportN
         // Draw cells for this row
         doc.rect(startX, currentY, pageWidth, rowHeight).stroke();
         
+        // Draw cells for this row
+        doc.rect(startX, currentY, tableWidth, rowHeight).stroke();
+
         // Draw cell borders
         let cellX = startX;
         columnWidths.forEach(width => {
@@ -665,7 +677,7 @@ const generateSocialSecurityPDF = async ({ payrollRunId, payrollRunData, reportN
       });
       
       // Add totals row
-      doc.rect(startX, currentY, pageWidth, rowHeight).stroke();
+      doc.rect(startX, currentY, tableWidth, rowHeight).stroke();
         
       // Draw cell borders
       let cellX = startX;
