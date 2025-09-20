@@ -9,7 +9,7 @@ const endDate1 = '2025-09-26';   // Friday
 console.log(`Working days from ${startDate1} to ${endDate1}: ${helpers.calculateWorkingDays(startDate1, endDate1)}`);
 // Expected: 5
 
-// Test case 2: Spans weekend (6 working days)
+// Test case 2: Spans weekend (7 working days)
 const startDate2 = '2025-09-22'; // Monday
 const endDate2 = '2025-09-30';   // Tuesday (next week)
 console.log(`Working days from ${startDate2} to ${endDate2}: ${helpers.calculateWorkingDays(startDate2, endDate2)}`);
