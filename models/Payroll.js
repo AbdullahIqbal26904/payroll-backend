@@ -1391,6 +1391,151 @@ class Payroll {
       throw error;
     }
   }
+  
+  /**
+   * Apply an override to a payroll item
+   * @param {number} payrollItemId - Payroll item ID
+   * @param {number} overrideAmount - The manual override amount
+   * @param {string} overrideReason - Reason for the override
+   * @param {number} userId - User ID applying the override
+   * @returns {Promise<Object>} Updated payroll item
+   */
+  static async applyOverride(payrollItemId, overrideAmount, overrideReason, userId) {
+    try {
+      const connection = await db.getConnection();
+      
+      try {
+        await connection.beginTransaction();
+        
+        // Get the current payroll item
+        const [items] = await connection.query(
+          `SELECT pi.*, pr.status
+           FROM payroll_items pi
+           JOIN payroll_runs pr ON pi.payroll_run_id = pr.id
+           WHERE pi.id = ?`,
+          [payrollItemId]
+        );
+        
+        if (items.length === 0) {
+          throw new Error('Payroll item not found');
+        }
+        
+        const item = items[0];
+        
+        // Verify that the payroll run is not finalized
+        if (item.status === 'finalized') {
+          throw new Error('Cannot override a finalized payroll run');
+        }
+        
+        // Calculate the new net pay based on the override amount
+        const originalGrossPay = parseFloat(item.gross_pay) || 0;
+        const newGrossPay = parseFloat(overrideAmount) || 0;
+        
+        // Calculate deductions based on the new gross pay
+        // Note: We're fetching employee information to get age for deduction calculations
+        let employeeAge = 0;
+        let paymentFrequency = 'Bi-Weekly';  // Default
+        
+        if (item.employee_id) {
+          // Get employee info for accurate deduction calculations
+          const [employees] = await connection.query(
+            `SELECT * FROM employees WHERE id = ?`,
+            [item.employee_id]
+          );
+          
+          if (employees.length > 0) {
+            const employee = employees[0];
+            employeeAge = employee.date_of_birth ? this.calculateAge(new Date(employee.date_of_birth)) : 0;
+            paymentFrequency = employee.payment_frequency || 'Bi-Weekly';
+          }
+        }
+        
+        // Get payroll settings
+        const [settings] = await connection.query('SELECT * FROM payroll_settings LIMIT 1');
+        const payrollSettings = settings[0];
+        
+        // Calculate new deductions based on the override amount
+        const newDeductions = this.calculateDeductions(
+          newGrossPay,
+          employeeAge,
+          payrollSettings,
+          paymentFrequency,
+          { is_exempt_ss: item.is_exempt_ss, is_exempt_medical: item.is_exempt_medical }
+        );
+        
+        // Update the payroll item with override information
+        await connection.query(
+          `UPDATE payroll_items SET
+            is_override = TRUE,
+            override_amount = ?,
+            override_reason = ?,
+            override_by = ?,
+            override_at = CURRENT_TIMESTAMP,
+            gross_pay = ?,
+            social_security_employee = ?,
+            social_security_employer = ?,
+            medical_benefits_employee = ?,
+            medical_benefits_employer = ?,
+            education_levy = ?,
+            net_pay = ?
+           WHERE id = ?`,
+          [
+            newGrossPay,
+            overrideReason,
+            userId,
+            newGrossPay,
+            newDeductions.socialSecurityEmployee,
+            newDeductions.socialSecurityEmployer,
+            newDeductions.medicalBenefitsEmployee,
+            newDeductions.medicalBenefitsEmployer,
+            newDeductions.educationLevy,
+            newDeductions.netPay,
+            payrollItemId
+          ]
+        );
+        
+        // Add audit trail entry for the override
+        if (item.employee_id) {
+          const AuditTrail = require('./AuditTrail');
+          
+          // Include override details in the new_values
+          const newValues = { 
+            gross_pay: newGrossPay, 
+            net_pay: newDeductions.netPay,
+            override_reason: overrideReason || 'Not provided',
+            override_change: `$${originalGrossPay} → $${newGrossPay}`
+          };
+          
+          await AuditTrail.create({
+            user_id: userId,
+            action: 'payroll_override',
+            entity: 'payroll_item',
+            entity_id: payrollItemId,
+            old_values: { gross_pay: originalGrossPay, net_pay: item.net_pay },
+            new_values: newValues,
+            ip_address: '127.0.0.1' // Default value when called directly from the model
+          });
+        }
+        
+        // Get the updated payroll item
+        const [updatedItems] = await connection.query(
+          `SELECT * FROM payroll_items WHERE id = ?`,
+          [payrollItemId]
+        );
+        
+        await connection.commit();
+        
+        return updatedItems[0];
+      } catch (error) {
+        await connection.rollback();
+        throw error;
+      } finally {
+        connection.release();
+      }
+    } catch (error) {
+      throw error;
+    }
+  }
 }
 
 module.exports = Payroll;

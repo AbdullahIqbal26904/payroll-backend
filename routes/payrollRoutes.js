@@ -13,6 +13,7 @@ const {
   getACHReport,
   upload
 } = require('../controllers/payrollController');
+const { applyPayrollOverride } = require('../controllers/overrideController');
 const { uploadTimesheet } = require('../controllers/timesheetController');
 const { protect, authorize } = require('../middlewares/auth');
 
@@ -30,6 +31,7 @@ router.get('/timesheet-periods/:id', getTimesheetPeriod);
 
 // Payroll calculation routes
 router.post('/calculate', calculatePayroll);
+router.post('/override', applyPayrollOverride);
 
 // Payroll reports routes
 router.get('/reports', getPayrollReports);
