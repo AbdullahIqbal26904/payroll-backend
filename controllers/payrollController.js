@@ -763,6 +763,10 @@ exports.getACHReport = async (req, res) => {
 
     // Get the ACH report data from the Payroll model
     const achReportData = await Payroll.generateACHReport(payrollRunId);
+    
+    // Get third-party payments data for this payroll run
+    const EmployeeLoan = require('../models/EmployeeLoan');
+    const thirdPartyPayments = await EmployeeLoan.getThirdPartyPaymentsForPayrollRun(payrollRunId);
 
     // If CSV format is requested, convert the data to CSV format
     if (format === 'csv') {
@@ -779,6 +783,22 @@ exports.getACHReport = async (req, res) => {
         }
       });
       
+      // Add third-party payments to the end of the CSV file using same format
+      if (thirdPartyPayments && thirdPartyPayments.length > 0) {
+        thirdPartyPayments.forEach(payment => {
+          // Check if the payment has the necessary fields
+          if (payment.third_party_routing_number && payment.third_party_account_number) {
+            // Format the data the same way as direct deposits
+            const name = `${payment.third_party_name} (${payment.first_name} ${payment.last_name})`;
+            const reference = payment.third_party_reference ? ` - ${payment.third_party_reference}` : '';
+            const institute = `Third-party payment${reference}`;
+            const amount = parseFloat(payment.payment_amount).toFixed(2);
+            
+            csvContent += `${payment.third_party_routing_number},${payment.third_party_account_number},Ck,${name},${institute},${amount},Cr\n`;
+          }
+        });
+      }
+      
       // Set headers for file download
       res.setHeader('Content-Type', 'text/csv');
       res.setHeader('Content-Disposition', `attachment; filename=ach-report-${achReportData.payrollRun?.period_id || payrollRunId}-${new Date().toISOString().split('T')[0]}.csv`);
@@ -788,9 +808,25 @@ exports.getACHReport = async (req, res) => {
     }
 
     // Process the data to mask sensitive account information in JSON response
+    // Mask sensitive data in third-party payments
+    const maskedThirdPartyPayments = thirdPartyPayments.map(payment => {
+      return {
+        ...payment,
+        third_party_account_number: payment.third_party_account_number ? 
+          `XXXX${payment.third_party_account_number.slice(-4)}` : null,
+        third_party_routing_number: payment.third_party_routing_number ? 
+          `XXXX${payment.third_party_routing_number.slice(-4)}` : null
+      };
+    });
+
     const maskedResponseData = {
       payrollRun: achReportData.payrollRun,
-      summary: achReportData.summary,
+      summary: {
+        ...achReportData.summary,
+        third_party_payment_total: thirdPartyPayments.reduce((sum, payment) => 
+          sum + parseFloat(payment.payment_amount || 0), 0).toFixed(2),
+        third_party_payment_count: thirdPartyPayments.length
+      },
       items: achReportData.items.map(item => {
         // Mask account numbers in the response for security
         if (item.has_banking_info) {
@@ -802,7 +838,8 @@ exports.getACHReport = async (req, res) => {
           };
         }
         return item;
-      })
+      }),
+      thirdPartyPayments: maskedThirdPartyPayments
     };
 
     // Return JSON response by default
