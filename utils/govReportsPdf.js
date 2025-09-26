@@ -820,7 +820,7 @@ const generateMedicalBenefitsPDF = async ({ payrollRunId, payrollRunData, report
       
       // Draw horizontal lines to separate rows in header
       doc.moveTo(startX, startY + 25).lineTo(startX + tableWidth, startY + 25).stroke();
-      doc.moveTo(startX, startY + 35).lineTo(startX + columnWidths[0] + columnWidths[1] + columnWidths[2], startY + 35).stroke();
+      // Remove the problematic line in second row for first 3 columns
       
       // Header row 1
       doc.text('No.', startX + 5, startY + 5, { width: columnWidths[0] - 10, align: 'center' });
@@ -848,12 +848,12 @@ const generateMedicalBenefitsPDF = async ({ payrollRunId, payrollRunData, report
       doc.text('for the', startX + columnWidths[0] + columnWidths[1] + columnWidths[2] + 5, 
                startY + 40, { width: columnWidths[3] - 10, align: 'center' });
                
-      // Rates - fix the formatting to avoid 3.503.50%
-      doc.text(`${standardRate}.50%`, startX + columnWidths[0] + columnWidths[1] + columnWidths[2] + columnWidths[3] + 5, 
+      // Rates - fixed the formatting to avoid 3.503.50%
+      doc.text(`${standardRate}%`, startX + columnWidths[0] + columnWidths[1] + columnWidths[2] + columnWidths[3] + 5, 
                startY + 30, { width: columnWidths[4] - 10, align: 'center' });
-      doc.text(`${employerRate}.50%`, startX + columnWidths[0] + columnWidths[1] + columnWidths[2] + columnWidths[3] + columnWidths[4] + 5, 
+      doc.text(`${employerRate}%`, startX + columnWidths[0] + columnWidths[1] + columnWidths[2] + columnWidths[3] + columnWidths[4] + 5, 
                startY + 30, { width: columnWidths[5] - 10, align: 'center' });
-      doc.text(`${standardRate + employerRate}%`, startX + columnWidths[0] + columnWidths[1] + columnWidths[2] + columnWidths[3] + columnWidths[4] + columnWidths[5] + 5, 
+      doc.text(`${totalRate}%`, startX + columnWidths[0] + columnWidths[1] + columnWidths[2] + columnWidths[3] + columnWidths[4] + columnWidths[5] + 5, 
                startY + 30, { width: columnWidths[6] - 10, align: 'center' });
                
       // Header row 3 - month
@@ -1076,8 +1076,7 @@ const generateEducationLevyPDF = async ({ payrollRunId, payrollRunData, reportNu
       
       // Page dimensions
       const pageWidth = doc.page.width - 100;
-      const startX = 50;
-      const startY = 150; // Start Y position after headers
+      const startY = 100; // Start Y position after headers (reduced from 150 to match other reports)
       
       // Format dates for display
       const monthYear = new Date(payrollRunData.pay_period_end).toLocaleDateString('en-US', { 
@@ -1085,28 +1084,35 @@ const generateEducationLevyPDF = async ({ payrollRunId, payrollRunData, reportNu
         year: 'numeric'
       });
       
-      // Add report header with professional format
+      // Add report header with centered formatting (matching other reports)
       doc.fontSize(14).font('Helvetica-Bold')
-         .text('EDUCATION LEVY REPORTING FORM', { align: 'left' });
+         .text('EDUCATION LEVY REPORTING FORM', { align: 'center' });
       
       doc.fontSize(12).font('Helvetica-Bold')
-         .text(`EMPLOYER: MEDICAL SURGICAL ASSOCIATES    Reg.# ${reportNumberDetails.formatted}`, { align: 'left' });
+         .text(`EMPLOYER: MEDICAL SURGICAL ASSOCIATES`, { align: 'center' });
+         
+      doc.fontSize(12).font('Helvetica-Bold')
+         .text(`Reg.# ${reportNumberDetails.formatted}`, { align: 'center' });
       
       doc.fontSize(10).font('Helvetica')
-         .text('P.O. Box W1228, Woods Centre, Antigua.', { align: 'left' });
+         .text('P.O. Box W1228, Woods Centre, Antigua.', { align: 'center' });
       
-      doc.moveDown(0.2);      
+      doc.moveDown(1);  // Increased spacing before month/year to avoid overlap with table    
       doc.fontSize(12).font('Helvetica-Bold')
-         .text(`${monthYear}`, { align: 'left' });
+         .text(`${monthYear}`, { align: 'center' });
       
       // Define column widths
       const columnWidths = [80, 190, 50, 130, 100];
+      
+      // Center the table on the page
+      const tableWidth = columnWidths.reduce((sum, width) => sum + width, 0);
+      const startX = (doc.page.width - tableWidth) / 2;
       
       // Create table header with multiple rows
       const headerY = startY;
       
       // Draw outer rectangle for header
-      doc.rect(startX, headerY, pageWidth, 50).stroke();
+      doc.rect(startX, headerY, tableWidth, 50).stroke();
       
       // Draw column dividers
       let headerX = startX;
@@ -1116,7 +1122,7 @@ const generateEducationLevyPDF = async ({ payrollRunId, payrollRunData, reportNu
       });
       
       // Draw the horizontal divider between header rows
-      doc.moveTo(startX, headerY + 25).lineTo(startX + pageWidth, headerY + 25).stroke();
+      doc.moveTo(startX, headerY + 25).lineTo(startX + tableWidth, headerY + 25).stroke();
       
       // Add header text - first row
       doc.fontSize(10).font('Helvetica-Bold');
@@ -1154,11 +1160,9 @@ const generateEducationLevyPDF = async ({ payrollRunId, payrollRunData, reportNu
       doc.text('Name & Address of Employer', startX + columnWidths[0] + 5, secondRowY + 8, 
                { width: columnWidths[1] - 10 });
       
-      // Rate text for deductions
-      doc.text('EC$500,000 and over', startX + columnWidths[0] + columnWidths[1] + columnWidths[2] + columnWidths[3] + 5, 
-               secondRowY + 5, { width: columnWidths[4] - 10, align: 'center' });
-      doc.text('2.5%', startX + columnWidths[0] + columnWidths[1] + columnWidths[2] + columnWidths[3] + 5, 
-               secondRowY + 15, { width: columnWidths[4] - 10, align: 'center' });
+      // Rate text for deductions - simplified to prevent overlap
+      doc.text('2.5% for EC$500,000+', startX + columnWidths[0] + columnWidths[1] + columnWidths[2] + columnWidths[3] + 5, 
+               secondRowY + 10, { width: columnWidths[4] - 10, align: 'center' });
       
       // Add data rows
       let currentY = startY + 50; // Start after the header rows
@@ -1193,22 +1197,25 @@ const generateEducationLevyPDF = async ({ payrollRunId, payrollRunData, reportNu
           
           // Format the date for the report (e.g. Jul-25) for continuation pages
           doc.fontSize(14).font('Helvetica-Bold')
-             .text('EDUCATION LEVY REPORTING FORM (Continued)', { align: 'left' });
+             .text('EDUCATION LEVY REPORTING FORM (Continued)', { align: 'center' });
           
           doc.fontSize(12).font('Helvetica-Bold')
-             .text(`EMPLOYER: MEDICAL SURGICAL ASSOCIATES    Reg.# ${reportNumberDetails.formatted}`, { align: 'left' });
+             .text(`EMPLOYER: MEDICAL SURGICAL ASSOCIATES`, { align: 'center' });
+          
+          doc.fontSize(12).font('Helvetica-Bold')
+             .text(`Reg.# ${reportNumberDetails.formatted}`, { align: 'center' });
           
           doc.fontSize(10).font('Helvetica')
-             .text('P.O. Box W1228, Woods Centre, Antigua.', { align: 'left' });
+             .text('P.O. Box W1228, Woods Centre, Antigua.', { align: 'center' });
           
-          doc.moveDown(0.2);      
+          doc.moveDown(1);  // Increased spacing before month/year to avoid overlap with table    
           doc.fontSize(12).font('Helvetica-Bold')
-             .text(`${monthYear}`, { align: 'left' });
+             .text(`${monthYear}`, { align: 'center' });
           
           currentY = 100;
           
           // Simple header for continuation
-          doc.rect(startX, currentY, pageWidth, 25).stroke();
+          doc.rect(startX, currentY, tableWidth, 25).stroke();
           doc.fontSize(10).font('Helvetica-Bold');
           
           // Draw column borders
@@ -1219,8 +1226,8 @@ const generateEducationLevyPDF = async ({ payrollRunId, payrollRunData, reportNu
           });
           
           // Add simple headers
-          doc.text('Reg. No.', startX + 5, currentY + 8, { width: columnWidths[0] - 5 });
-          doc.text('Employee', startX + columnWidths[0] + 5, currentY + 8, { width: columnWidths[1] - 5 });
+          doc.text('Reg. No.', startX + 5, currentY + 8, { width: columnWidths[0] - 5, align: 'center' });
+          doc.text('Employee', startX + columnWidths[0] + 5, currentY + 8, { width: columnWidths[1] - 5, align: 'center' });
           doc.text('Sex', startX + columnWidths[0] + columnWidths[1] + 5, currentY + 8, { width: columnWidths[2] - 5, align: 'center' });
           doc.text('Earnings', startX + columnWidths[0] + columnWidths[1] + columnWidths[2] + 5, currentY + 8, { width: columnWidths[3] - 5, align: 'center' });
           doc.text('Deduction', startX + columnWidths[0] + columnWidths[1] + columnWidths[2] + columnWidths[3] + 5, currentY + 8, { width: columnWidths[4] - 5, align: 'center' });
@@ -1229,7 +1236,7 @@ const generateEducationLevyPDF = async ({ payrollRunId, payrollRunData, reportNu
         }
         
         // Draw cells for this row
-        doc.rect(startX, currentY, pageWidth, rowHeight).stroke();
+        doc.rect(startX, currentY, tableWidth, rowHeight).stroke();
         
         // Draw cell borders
         let cellX = startX;
@@ -1243,7 +1250,7 @@ const generateEducationLevyPDF = async ({ payrollRunId, payrollRunData, reportNu
         
         // Registration Number (use direct social_security_no value if available)
         const regNumber = employee.social_security_no || (employee.ssn ? employee.ssn.formatted : '');
-        doc.text(regNumber, startX + 5, currentY + 8, { width: columnWidths[0] - 5 });
+        doc.text(regNumber, startX + 5, currentY + 8, { width: columnWidths[0] - 5, align: 'center' });
         
         // Employee name
         doc.text(employeeName, startX + columnWidths[0] + 5, currentY + 8, { width: columnWidths[1] - 5 });
@@ -1252,20 +1259,20 @@ const generateEducationLevyPDF = async ({ payrollRunId, payrollRunData, reportNu
         doc.text(employee.formattedGender, startX + columnWidths[0] + columnWidths[1] + 5, currentY + 8, 
                 { width: columnWidths[2] - 5, align: 'center' });
         
-        // Earnings
+        // Earnings - fix alignment for Chargeable Emoluments
         doc.text(formatMoney(earnings), startX + columnWidths[0] + columnWidths[1] + columnWidths[2] + 5, 
-                currentY + 8, { width: columnWidths[3] - 5, align: 'right' });
+                currentY + 8, { width: columnWidths[3] - 10, align: 'center' });
         
-        // Deduction
+        // Deduction - fix alignment to match other columns
         doc.text(formatMoney(deduction), startX + columnWidths[0] + columnWidths[1] + columnWidths[2] + 
-                columnWidths[3] + 5, currentY + 8, { width: columnWidths[4] - 5, align: 'right' });
+                columnWidths[3] + 5, currentY + 8, { width: columnWidths[4] - 10, align: 'center' });
         
         currentY += rowHeight;
       });
       
       // Add totals row
       // Draw the totals row border
-      doc.rect(startX, currentY, pageWidth, rowHeight).stroke();
+      doc.rect(startX, currentY, tableWidth, rowHeight).stroke();
         
       // Draw cell borders
       let cellX = startX;
@@ -1278,37 +1285,21 @@ const generateEducationLevyPDF = async ({ payrollRunId, payrollRunData, reportNu
       doc.fontSize(10).font('Helvetica-Bold');
       
       // TOTALS text
-      doc.text('TOTALS', startX + columnWidths[0] + 5, currentY + 8, { width: columnWidths[1] - 5 });
+      doc.text('TOTALS', startX + columnWidths[0] + 5, currentY + 8, { width: columnWidths[1] - 5, align: 'center' });
       
-      // Total earnings
+      // Total earnings - fix alignment to match other cells
       doc.text(formatMoney(totalEarnings), startX + columnWidths[0] + columnWidths[1] + columnWidths[2] + 5, 
-              currentY + 8, { width: columnWidths[3] - 5, align: 'right' });
+              currentY + 8, { width: columnWidths[3] - 10, align: 'center' });
       
-      // Total deductions
+      // Total deductions - fix alignment to match other cells
       doc.text(formatMoney(totalDeductions), startX + columnWidths[0] + columnWidths[1] + columnWidths[2] + 
-              columnWidths[3] + 5, currentY + 8, { width: columnWidths[4] - 5, align: 'right' });
-      
-      // Add prepared by section
-      currentY += rowHeight + 50;
-      
-      // Add signature lines
-      doc.fontSize(10).font('Helvetica');
-      
-      // For the employer signature
-      doc.text('For the Employer:', startX, currentY);
-      doc.moveTo(startX, currentY + 30).lineTo(startX + 200, currentY + 30).stroke();
-      doc.fontSize(8).text('(Signature)', startX + 75, currentY + 35);
-      
-      // For the date
-      doc.fontSize(10).font('Helvetica');
-      doc.text('Date:', startX + 350, currentY);
-      doc.moveTo(startX + 350, currentY + 30).lineTo(startX + 450, currentY + 30).stroke();
+              columnWidths[3] + 5, currentY + 8, { width: columnWidths[4] - 10, align: 'center' });
       
       // Add generation date at bottom
-      currentY += 80;
+      currentY += rowHeight + 20;
       
       doc.fontSize(8).font('Helvetica-Oblique').text(`Generated on ${new Date().toLocaleDateString()}`, 
-        startX, currentY, { align: 'left' });
+        startX, doc.page.height - 50, { align: 'center', width: tableWidth });
       
       // Finalize the PDF and end the stream
       doc.end();
