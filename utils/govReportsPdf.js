@@ -801,7 +801,7 @@ const generateMedicalBenefitsPDF = async ({ payrollRunId, payrollRunData, report
       // Get rates
       const standardRate = settings.medical_benefits_employee_rate;
       const employerRate = settings.medical_benefits_employer_rate;
-      const totalRate = standardRate + employerRate;
+      const totalRate = parseFloat(standardRate) + parseFloat(employerRate);
       
       // Create a border for the entire table
       doc.rect(startX, startY, tableWidth, 50).stroke();
@@ -865,7 +865,7 @@ const generateMedicalBenefitsPDF = async ({ payrollRunId, payrollRunData, report
         const earnings = parseFloat(employee.total_earnings || 0);
         const employeeContribution = parseFloat(employee.total_mb_employee || 0);
         const employerContribution = parseFloat(employee.total_mb_employer || 0);
-        const totalContrib = employeeContribution + employerContribution;
+        const totalContrib = parseFloat(employeeContribution) + parseFloat(employerContribution);
         
         // Add to totals
         totalEarnings += earnings;
@@ -915,7 +915,7 @@ const generateMedicalBenefitsPDF = async ({ payrollRunId, payrollRunData, report
           doc.text('Earnings', startX + columnWidths[0] + columnWidths[1] + columnWidths[2] + 5, currentY + 8, { width: columnWidths[3] - 10, align: 'center' });
           doc.text(`${standardRate}.50%`, startX + columnWidths[0] + columnWidths[1] + columnWidths[2] + columnWidths[3] + 5, currentY + 8, { width: columnWidths[4] - 10, align: 'center' });
           doc.text(`${employerRate}.50%`, startX + columnWidths[0] + columnWidths[1] + columnWidths[2] + columnWidths[3] + columnWidths[4] + 5, currentY + 8, { width: columnWidths[5] - 10, align: 'center' });
-          doc.text(`${standardRate + employerRate}%`, startX + columnWidths[0] + columnWidths[1] + columnWidths[2] + columnWidths[3] + columnWidths[4] + columnWidths[5] + 5, currentY + 8, { width: columnWidths[6] - 10, align: 'center' });
+          doc.text(`${parseFloat(standardRate) + parseFloat(employerRate)}.50%`, startX + columnWidths[0] + columnWidths[1] + columnWidths[2] + columnWidths[3] + columnWidths[4] + columnWidths[5] + 5, currentY + 8, { width: columnWidths[6] - 10, align: 'center' });
           
           currentY += 25;
         }
@@ -971,9 +971,9 @@ const generateMedicalBenefitsPDF = async ({ payrollRunId, payrollRunData, report
         currentY += rowHeight;
       });
       
-      // Add totals row
-      // Draw the totals row border
-      doc.rect(startX, currentY, pageWidth, rowHeight).stroke();
+  // Add totals row
+  // Draw the totals row border
+  doc.rect(startX, currentY, tableWidth, rowHeight).stroke();
         
       // Draw cell borders
       let cellX = startX;
