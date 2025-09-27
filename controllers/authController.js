@@ -429,41 +429,6 @@ exports.disableMFA = async (req, res) => {
 };
 
 /**
- * @desc    Get MFA status for a user
- * @route   GET /api/auth/mfa-status
- * @access  Private
- */
-exports.getMfaStatus = async (req, res) => {
-  try {
-    // Find user
-    const [rows] = await db.query(
-      'SELECT mfa_enabled, email_mfa_enabled FROM users WHERE id = ?',
-      [req.user.id]
-    );
-    
-    if (rows.length === 0) {
-      return res.status(404).json({
-        success: false,
-        message: 'User not found'
-      });
-    }
-    
-    const user = rows[0];
-    
-    // Return MFA status
-    res.status(200).json(formatSuccess('MFA status retrieved successfully', {
-      appMfaEnabled: user.mfa_enabled === 1 || user.mfa_enabled === true,
-      emailMfaEnabled: user.email_mfa_enabled === 1 || user.email_mfa_enabled === true,
-      anyMfaEnabled: (user.mfa_enabled === 1 || user.mfa_enabled === true) || 
-                    (user.email_mfa_enabled === 1 || user.email_mfa_enabled === true)
-    }));
-  } catch (error) {
-    console.error('Get MFA status error:', error);
-    res.status(500).json(formatError(error));
-  }
-};
-
-/**
  * @desc    Generate new backup codes
  * @route   POST /api/auth/generate-backup-codes
  * @access  Private
@@ -791,7 +756,7 @@ exports.disableEmailMFA = async (req, res) => {
     );
     
     // Send response
-    res.status(200).json(forxmatSuccess('Email MFA disabled successfully'));
+    res.status(200).json(formatSuccess('Email MFA disabled successfully'));
   } catch (error) {
     console.error('Email MFA disable error:', error);
     res.status(500).json(formatError(error));
