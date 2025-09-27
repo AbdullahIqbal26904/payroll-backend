@@ -442,7 +442,6 @@ class Payroll {
             grossPay,
             age,
             payrollSettings,
-            employeeData.payment_frequency,
             employeeData
           );
           
@@ -733,17 +732,19 @@ class Payroll {
    * @param {number} grossPay - Gross pay amount
    * @param {number} age - Employee age
    * @param {Object} settings - Payroll settings
-   * @param {string} paymentFrequency - Payment frequency (Bi-Weekly or Monthly)
-   * @param {Object} employeeData - Employee data for exemption checks
+   * @param {Object} employeeData - Employee data for exemption checks and payment frequency
    * @returns {Object} Calculated deductions
    */
-  static calculateDeductions(grossPay, age, settings, paymentFrequency = 'Bi-Weekly', employeeData = null) {
+  static calculateDeductions(grossPay, age, settings, employeeData = null) {
     // Initialize deduction amounts
     let socialSecurityEmployee = 0;
     let socialSecurityEmployer = 0;
     let medicalBenefitsEmployee = 0;
     let medicalBenefitsEmployer = 0;
     let educationLevy = 0;
+    
+    // Get payment frequency from employee data or default to Bi-Weekly
+    const paymentFrequency = employeeData?.payment_frequency || 'Bi-Weekly';
     
     // 1. Social Security - 16% of gross salary (7% employee, 9% employer)
     // - Maximum monthly insurable earning is $6,500
@@ -1459,8 +1460,11 @@ class Payroll {
           newGrossPay,
           employeeAge,
           payrollSettings,
-          paymentFrequency,
-          { is_exempt_ss: item.is_exempt_ss, is_exempt_medical: item.is_exempt_medical }
+          { 
+            is_exempt_ss: item.is_exempt_ss, 
+            is_exempt_medical: item.is_exempt_medical,
+            payment_frequency: paymentFrequency
+          }
         );
         
         // Update the payroll item with override information

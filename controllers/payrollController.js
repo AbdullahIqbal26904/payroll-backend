@@ -320,7 +320,7 @@ exports.getTimesheetPeriod = async (req, res) => {
  */
 exports.calculatePayroll = async (req, res) => {
   try {
-    const { periodId, payDate, paymentFrequency = 'Bi-Weekly' } = req.body;
+    const { periodId, payDate } = req.body;
     
     if (!periodId) {
       return res.status(400).json(formatError({
@@ -332,8 +332,7 @@ exports.calculatePayroll = async (req, res) => {
     const result = await Payroll.calculateForPeriod(
       periodId,
       {
-        payDate: payDate ? new Date(payDate) : new Date(),
-        paymentFrequency
+        payDate: payDate ? new Date(payDate) : new Date()
       },
       req.user.id
     );
