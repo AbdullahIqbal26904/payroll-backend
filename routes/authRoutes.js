@@ -12,7 +12,8 @@ const {
   verifyAndEnableEmailMFA,
   disableEmailMFA,
   sendMfaCode,
-  verifyEmailMfaLogin
+  verifyEmailMfaLogin,
+  getMfaStatus
 } = require('../controllers/authController');
 const { protect } = require('../middlewares/auth');
 const { loginValidation, validateRequest, mfaValidation } = require('../middlewares/validator');
@@ -29,6 +30,7 @@ router.post('/send-mfa-code', sendMfaCode);
 
 // Protected routes
 router.get('/me', protect, getMe);
+router.get('/mfa-status', protect, getMfaStatus);
 router.put('/change-password', protect, changePassword);
 
 // App-based MFA routes (all protected)

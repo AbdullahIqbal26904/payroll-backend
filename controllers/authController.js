@@ -5,6 +5,41 @@ const { generateToken, formatSuccess, formatError } = require('../utils/helpers'
 const { verifyToken, verifyBackupCode, generateEmailCode, sendMfaCodeByEmail } = require('../utils/mfaUtils');
 
 /**
+ * @desc    Get MFA status for a user
+ * @route   GET /api/auth/mfa-status
+ * @access  Private
+ */
+exports.getMfaStatus = async (req, res) => {
+  try {
+    // Find user
+    const [rows] = await db.query(
+      'SELECT mfa_enabled, email_mfa_enabled FROM users WHERE id = ?',
+      [req.user.id]
+    );
+    
+    if (rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+    
+    const user = rows[0];
+    
+    // Return MFA status
+    res.status(200).json(formatSuccess('MFA status retrieved successfully', {
+      appMfaEnabled: user.mfa_enabled === 1 || user.mfa_enabled === true,
+      emailMfaEnabled: user.email_mfa_enabled === 1 || user.email_mfa_enabled === true,
+      anyMfaEnabled: (user.mfa_enabled === 1 || user.mfa_enabled === true) || 
+                    (user.email_mfa_enabled === 1 || user.email_mfa_enabled === true)
+    }));
+  } catch (error) {
+    console.error('Get MFA status error:', error);
+    res.status(500).json(formatError(error));
+  }
+};
+
+/**
  * @desc    Login user - first step
  * @route   POST /api/auth/login
  * @access  Public
@@ -253,6 +288,21 @@ exports.setupMFA = async (req, res) => {
     
     const user = rows[0];
     
+    // Check if any type of MFA is already enabled
+    if (user.mfa_enabled || user.email_mfa_enabled) {
+      return res.status(400).json({
+        success: false,
+        message: 'MFA is already enabled for this user. Please disable existing MFA before setting up a new one.'
+      });
+    }
+    
+    if (rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+    
     // Generate new secret
     const secret = require('../utils/mfaUtils').generateSecret(user.email);
     
@@ -379,6 +429,41 @@ exports.disableMFA = async (req, res) => {
 };
 
 /**
+ * @desc    Get MFA status for a user
+ * @route   GET /api/auth/mfa-status
+ * @access  Private
+ */
+exports.getMfaStatus = async (req, res) => {
+  try {
+    // Find user
+    const [rows] = await db.query(
+      'SELECT mfa_enabled, email_mfa_enabled FROM users WHERE id = ?',
+      [req.user.id]
+    );
+    
+    if (rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+    
+    const user = rows[0];
+    
+    // Return MFA status
+    res.status(200).json(formatSuccess('MFA status retrieved successfully', {
+      appMfaEnabled: user.mfa_enabled === 1 || user.mfa_enabled === true,
+      emailMfaEnabled: user.email_mfa_enabled === 1 || user.email_mfa_enabled === true,
+      anyMfaEnabled: (user.mfa_enabled === 1 || user.mfa_enabled === true) || 
+                    (user.email_mfa_enabled === 1 || user.email_mfa_enabled === true)
+    }));
+  } catch (error) {
+    console.error('Get MFA status error:', error);
+    res.status(500).json(formatError(error));
+  }
+};
+
+/**
  * @desc    Generate new backup codes
  * @route   POST /api/auth/generate-backup-codes
  * @access  Private
@@ -446,6 +531,14 @@ exports.setupEmailMFA = async (req, res) => {
     }
     
     const user = rows[0];
+    
+    // Check if any type of MFA is already enabled
+    if (user.mfa_enabled || user.email_mfa_enabled) {
+      return res.status(400).json({
+        success: false,
+        message: 'MFA is already enabled for this user. Please disable existing MFA before setting up a new one.'
+      });
+    }
     
     // Make sure user has an email
     if (!user.email) {
