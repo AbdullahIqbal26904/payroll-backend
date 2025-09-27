@@ -62,9 +62,11 @@ class EmployeeLoan {
 
       // Execute query
       const [loans] = await db.query(query, queryParams);
-      
+
+      const enrichedLoans = loans.map(loan => this.enrichLoanRow(loan));
+
       return {
-        loans,
+        loans: enrichedLoans,
         pagination: {
           total,
           limit,
@@ -100,6 +102,7 @@ class EmployeeLoan {
       }
 
       const loan = loans[0];
+      const enrichedLoan = this.enrichLoanRow(loan);
 
       // Get payment history
       const [payments] = await db.query(
@@ -111,7 +114,7 @@ class EmployeeLoan {
       );
 
       return {
-        ...loan,
+        ...enrichedLoan,
         payments
       };
     } catch (error) {
@@ -290,8 +293,8 @@ class EmployeeLoan {
          ORDER BY created_at ASC`,
         [employeeId]
       );
-      
-      return loans;
+
+      return loans.map(loan => this.enrichLoanRow(loan));
     } catch (error) {
       throw error;
     }
@@ -421,6 +424,36 @@ class EmployeeLoan {
     }
   }
   
+  static enrichLoanRow(loan) {
+    if (!loan) {
+      return loan;
+    }
+
+    const installmentAmount = parseFloat(loan.installment_amount);
+    if (!Number.isFinite(installmentAmount) || installmentAmount <= 0) {
+      return {
+        ...loan,
+        total_installments: null,
+        installments_remaining: null
+      };
+    }
+
+    const totalAmount = parseFloat(loan.total_amount);
+    const remainingAmount = parseFloat(loan.remaining_amount);
+
+    const normalizedTotal = Number.isFinite(totalAmount) && totalAmount >= 0 ? totalAmount : 0;
+    const normalizedRemaining = Number.isFinite(remainingAmount) ? Math.max(0, remainingAmount) : normalizedTotal;
+
+    const totalInstallments = Math.max(0, Math.ceil(normalizedTotal / installmentAmount));
+    const installmentsRemaining = Math.max(0, Math.ceil(normalizedRemaining / installmentAmount));
+
+    return {
+      ...loan,
+      total_installments: totalInstallments,
+      installments_remaining: installmentsRemaining
+    };
+  }
+
   /**
    * Calculate the term of a loan in years
    * @param {Date|string} startDate - Loan start date
