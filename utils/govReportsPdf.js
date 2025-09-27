@@ -472,8 +472,8 @@ const generateSocialSecurityPDF = async ({ payrollRunId, payrollRunData, reportN
       const columnWidths = [90, 110, 30, 100, 80, 80, 80];
       
       // Center the table on the page
-      const tableWidth = columnWidths.reduce((sum, width) => sum + width, 0);
-      const startX = (doc.page.width - tableWidth) / 2;
+  const tableWidth = columnWidths.reduce((sum, width) => sum + width, 0);
+  let startX = (doc.page.width - tableWidth) / 2;
       
       // Calculate SS rates
       const employeeRate = settings.social_security_employee_rate;
@@ -818,17 +818,13 @@ const generateMedicalBenefitsPDF = async ({ payrollRunId, payrollRunData, report
         doc.moveTo(currentX, startY).lineTo(currentX, startY + 50).stroke();
       });
       
-      // Draw horizontal lines to separate rows in header
-      doc.moveTo(startX, startY + 25).lineTo(startX + tableWidth, startY + 25).stroke();
-      // Remove the problematic line in second row for first 3 columns
-      
       // Header row 1
       doc.text('No.', startX + 5, startY + 5, { width: columnWidths[0] - 10, align: 'center' });
       doc.text('Name of', startX + columnWidths[0] + 5, startY + 5, { width: columnWidths[1] - 10, align: 'center' });
       doc.text('Sex', startX + columnWidths[0] + columnWidths[1] + 5, startY + 5, { width: columnWidths[2] - 10, align: 'center' });
       
       // Employees column spans two rows
-      doc.text('Employees', startX + columnWidths[0] + columnWidths[1] + columnWidths[2] + 5, 
+      doc.text('Employees Earnings for the month', startX + columnWidths[0] + columnWidths[1] + columnWidths[2] + 5, 
                startY + 5, { width: columnWidths[3] - 10, align: 'center' });
                
       // Employees / Employers columns
@@ -841,12 +837,6 @@ const generateMedicalBenefitsPDF = async ({ payrollRunId, payrollRunData, report
       
       // Header row 2 - Employee
       doc.text('Employee', startX + columnWidths[0] + 5, startY + 30, { width: columnWidths[1] - 10, align: 'center' });
-      
-      // Header row 2 - Earnings
-      doc.text('Earnings', startX + columnWidths[0] + columnWidths[1] + columnWidths[2] + 5, 
-               startY + 30, { width: columnWidths[3] - 10, align: 'center' });
-      doc.text('for the', startX + columnWidths[0] + columnWidths[1] + columnWidths[2] + 5, 
-               startY + 40, { width: columnWidths[3] - 10, align: 'center' });
                
       // Rates - fixed the formatting to avoid 3.503.50%
       doc.text(`${standardRate}%`, startX + columnWidths[0] + columnWidths[1] + columnWidths[2] + columnWidths[3] + 5, 
@@ -856,9 +846,6 @@ const generateMedicalBenefitsPDF = async ({ payrollRunId, payrollRunData, report
       doc.text(`${totalRate}%`, startX + columnWidths[0] + columnWidths[1] + columnWidths[2] + columnWidths[3] + columnWidths[4] + columnWidths[5] + 5, 
                startY + 30, { width: columnWidths[6] - 10, align: 'center' });
                
-      // Header row 3 - month
-      doc.text('month', startX + columnWidths[0] + columnWidths[1] + columnWidths[2] + 5, 
-              startY + 40, { width: columnWidths[3] - 10, align: 'center' });
       
       // Add data rows
       let currentY = startY + 50;  // Start after the header rows
@@ -1074,10 +1061,6 @@ const generateEducationLevyPDF = async ({ payrollRunId, payrollRunData, reportNu
       const styling = setupPdfStyling(doc);
       const { colors, fonts } = styling;
       
-      // Page dimensions
-      const pageWidth = doc.page.width - 100;
-      const startY = 100; // Start Y position after headers (reduced from 150 to match other reports)
-      
       // Format dates for display
       const monthYear = new Date(payrollRunData.pay_period_end).toLocaleDateString('en-US', { 
         month: 'long', 
@@ -1100,9 +1083,13 @@ const generateEducationLevyPDF = async ({ payrollRunId, payrollRunData, reportNu
       doc.moveDown(1);  // Increased spacing before month/year to avoid overlap with table    
       doc.fontSize(12).font('Helvetica-Bold')
          .text(`${monthYear}`, { align: 'center' });
+
+      const headerSpacing = 20;
+      const startY = doc.y + headerSpacing; // Start position based on rendered header content
       
       // Define column widths
       const columnWidths = [80, 190, 50, 130, 100];
+      const headerHeight = 50;
       
       // Center the table on the page
       const tableWidth = columnWidths.reduce((sum, width) => sum + width, 0);
@@ -1112,17 +1099,17 @@ const generateEducationLevyPDF = async ({ payrollRunId, payrollRunData, reportNu
       const headerY = startY;
       
       // Draw outer rectangle for header
-      doc.rect(startX, headerY, tableWidth, 50).stroke();
+      doc.rect(startX, headerY, tableWidth, headerHeight).stroke();
       
       // Draw column dividers
       let headerX = startX;
       columnWidths.forEach(width => {
         headerX += width;
-        doc.moveTo(headerX, headerY).lineTo(headerX, headerY + 50).stroke();
+        doc.moveTo(headerX, headerY).lineTo(headerX, headerY + headerHeight).stroke();
       });
       
       // Draw the horizontal divider between header rows
-      doc.moveTo(startX, headerY + 25).lineTo(startX + tableWidth, headerY + 25).stroke();
+      doc.moveTo(startX, headerY + (headerHeight / 2)).lineTo(startX + tableWidth, headerY + (headerHeight / 2)).stroke();
       
       // Add header text - first row
       doc.fontSize(10).font('Helvetica-Bold');
@@ -1150,8 +1137,8 @@ const generateEducationLevyPDF = async ({ payrollRunId, payrollRunData, reportNu
       doc.text('@3%', startX + columnWidths[0] + columnWidths[1] + columnWidths[2] + columnWidths[3] + 5, 
                headerY + 8 + 12, { width: columnWidths[4] - 10, align: 'center' });
       
-      // Second row - for additional details and rate information
-      const secondRowY = headerY + 25;
+  // Second row - for additional details and rate information
+  const secondRowY = headerY + (headerHeight / 2);
       
       // Add additional header information
       doc.fontSize(9);
@@ -1165,7 +1152,7 @@ const generateEducationLevyPDF = async ({ payrollRunId, payrollRunData, reportNu
                secondRowY + 10, { width: columnWidths[4] - 10, align: 'center' });
       
       // Add data rows
-      let currentY = startY + 50; // Start after the header rows
+  let currentY = startY + headerHeight; // Start after the header rows
       const rowHeight = 25;
       
       // Track totals
@@ -1193,7 +1180,6 @@ const generateEducationLevyPDF = async ({ payrollRunId, payrollRunData, reportNu
         // Check if we need a new page
         if (currentY > doc.page.height - 80) {
           doc.addPage();
-          currentY = 50;
           
           // Format the date for the report (e.g. Jul-25) for continuation pages
           doc.fontSize(14).font('Helvetica-Bold')
@@ -1212,27 +1198,30 @@ const generateEducationLevyPDF = async ({ payrollRunId, payrollRunData, reportNu
           doc.fontSize(12).font('Helvetica-Bold')
              .text(`${monthYear}`, { align: 'center' });
           
-          currentY = 100;
-          
+          startX = (doc.page.width - tableWidth) / 2;
+
+          const continuationHeaderY = doc.y + headerSpacing;
+          const continuationHeaderHeight = 25;
+
           // Simple header for continuation
-          doc.rect(startX, currentY, tableWidth, 25).stroke();
+          doc.rect(startX, continuationHeaderY, tableWidth, continuationHeaderHeight).stroke();
           doc.fontSize(10).font('Helvetica-Bold');
           
           // Draw column borders
           let headerX = startX;
           columnWidths.forEach(width => {
             headerX += width;
-            doc.moveTo(headerX, currentY).lineTo(headerX, currentY + 25).stroke();
+            doc.moveTo(headerX, continuationHeaderY).lineTo(headerX, continuationHeaderY + continuationHeaderHeight).stroke();
           });
           
           // Add simple headers
-          doc.text('Reg. No.', startX + 5, currentY + 8, { width: columnWidths[0] - 5, align: 'center' });
-          doc.text('Employee', startX + columnWidths[0] + 5, currentY + 8, { width: columnWidths[1] - 5, align: 'center' });
-          doc.text('Sex', startX + columnWidths[0] + columnWidths[1] + 5, currentY + 8, { width: columnWidths[2] - 5, align: 'center' });
-          doc.text('Earnings', startX + columnWidths[0] + columnWidths[1] + columnWidths[2] + 5, currentY + 8, { width: columnWidths[3] - 5, align: 'center' });
-          doc.text('Deduction', startX + columnWidths[0] + columnWidths[1] + columnWidths[2] + columnWidths[3] + 5, currentY + 8, { width: columnWidths[4] - 5, align: 'center' });
+          doc.text('Reg. No.', startX + 5, continuationHeaderY + 8, { width: columnWidths[0] - 5, align: 'center' });
+          doc.text('Employee', startX + columnWidths[0] + 5, continuationHeaderY + 8, { width: columnWidths[1] - 5, align: 'center' });
+          doc.text('Sex', startX + columnWidths[0] + columnWidths[1] + 5, continuationHeaderY + 8, { width: columnWidths[2] - 5, align: 'center' });
+          doc.text('Earnings', startX + columnWidths[0] + columnWidths[1] + columnWidths[2] + 5, continuationHeaderY + 8, { width: columnWidths[3] - 5, align: 'center' });
+          doc.text('Deduction', startX + columnWidths[0] + columnWidths[1] + columnWidths[2] + columnWidths[3] + 5, continuationHeaderY + 8, { width: columnWidths[4] - 5, align: 'center' });
           
-          currentY += 25;
+          currentY = continuationHeaderY + continuationHeaderHeight;
         }
         
         // Draw cells for this row
