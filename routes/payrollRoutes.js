@@ -3,6 +3,7 @@ const {
   calculatePayroll,
   getPayrollReports,
   getPayrollReport,
+  updatePayrollStatus,
   getTimesheetPeriods,
   getTimesheetPeriod,
   downloadPaystub,
@@ -35,6 +36,7 @@ router.post('/override', applyPayrollOverride);
 
 // Payroll reports routes
 router.get('/reports', getPayrollReports);
+router.patch('/reports/:id/status', updatePayrollStatus);
 router.get('/reports/:id', getPayrollReport);
 router.get('/deductions-report', getDeductionsReport);
 router.get('/ach-report/:id', getACHReport);

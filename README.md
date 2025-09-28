@@ -18,6 +18,10 @@ Phase 2 has been implemented with the following features:
 
 ## Latest Updates
 
+- Added payroll run finalization workflow:
+  - Admins can finalize completed payroll runs via `PATCH /api/payroll/reports/:id/status`
+  - Finalized runs lock manual overrides and cannot revert to a non-finalized state
+
 - Added bank-focused ACH report for direct deposit processing:
   - Generate ACH reports for any completed payroll run
   - Export in CSV format compatible with banking systems
@@ -124,6 +128,7 @@ A Postman collection is included at the root of the project (`Payroll_System_API
 |--------|----------|-------------|
 | POST | `/api/payroll/calculate` | Calculate payroll for a period |
 | GET | `/api/payroll/reports` | Get all payroll reports |
+| PATCH | `/api/payroll/reports/:id/status` | Finalize a completed payroll run and lock overrides |
 | GET | `/api/payroll/reports/:id` | Get payroll report details |
 | GET | `/api/payroll/paystub/:payrollRunId/:employeeId` | Download employee paystub PDF |
 | POST | `/api/payroll/email-paystubs` | Email paystubs to employees (bulk or selected) |
@@ -132,6 +137,8 @@ A Postman collection is included at the root of the project (`Payroll_System_API
 | PUT | `/api/payroll/settings` | Update payroll settings |
 | GET | `/api/payroll/deductions-report` | Get management-focused deductions report |
 | GET | `/api/payroll/ach-report/:id` | Get bank-focused ACH report for direct deposits |
+
+> **Note:** Once a payroll run is finalized its status cannot be changed and manual overrides are blocked automatically.
 
 <!-- Employee Loan Management section removed -->
 

@@ -345,6 +345,54 @@ exports.calculatePayroll = async (req, res) => {
 };
 
 /**
+ * @desc    Update payroll run status (finalize)
+ * @route   PATCH /api/payroll/reports/:id/status
+ * @access  Private/Admin
+ */
+exports.updatePayrollStatus = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+
+    if (!status) {
+      return res.status(400).json(formatError({
+        message: 'Status is required'
+      }));
+    }
+
+    const payrollRunId = parseInt(id, 10);
+
+    if (Number.isNaN(payrollRunId)) {
+      return res.status(400).json(formatError({
+        message: 'Payroll run ID must be a valid number'
+      }));
+    }
+
+    const updatedRun = await Payroll.updatePayrollStatus(payrollRunId, status);
+
+    return res.status(200).json(formatSuccess('Payroll status updated successfully', updatedRun));
+  } catch (error) {
+    console.error('Error updating payroll status:', error);
+
+    const message = error.message || '';
+
+    if (message.toLowerCase().includes('not found')) {
+      return res.status(404).json(formatError(error));
+    }
+
+    if (
+      message.toLowerCase().includes('invalid') ||
+      message.toLowerCase().includes('finalized') ||
+      message.toLowerCase().includes('completed')
+    ) {
+      return res.status(400).json(formatError(error));
+    }
+
+    return res.status(500).json(formatError(error));
+  }
+};
+
+/**
  * @desc    Get payroll reports
  * @route   GET /api/payroll/reports
  * @access  Private/Admin

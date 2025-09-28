@@ -1392,6 +1392,59 @@ class Payroll {
       throw error;
     }
   }
+
+  /**
+   * Update the status of a payroll run with finalization safeguards
+   * @param {number} payrollRunId - Payroll run ID
+   * @param {string} newStatus - Target status value (supports only 'finalized')
+   * @returns {Promise<Object>} Updated payroll run
+   */
+  static async updatePayrollStatus(payrollRunId, newStatus) {
+    try {
+      const supportedStatuses = ['finalized'];
+
+      if (!supportedStatuses.includes(newStatus)) {
+        throw new Error(`Invalid payroll status: ${newStatus}. Only 'finalized' is supported.`);
+      }
+
+      const [runs] = await db.query(
+        `SELECT * FROM payroll_runs WHERE id = ?`,
+        [payrollRunId]
+      );
+
+      if (runs.length === 0) {
+        throw new Error('Payroll run not found');
+      }
+
+      const currentRun = runs[0];
+
+      if (currentRun.status === 'finalized') {
+        if (newStatus === 'finalized') {
+          return currentRun;
+        }
+
+        throw new Error('Payroll run has already been finalized and cannot be updated');
+      }
+
+      if (!['completed', 'completed_with_errors'].includes(currentRun.status)) {
+        throw new Error('Only completed payroll runs can be finalized');
+      }
+
+      await db.query(
+        `UPDATE payroll_runs SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+        [newStatus, payrollRunId]
+      );
+
+      const [updatedRuns] = await db.query(
+        `SELECT * FROM payroll_runs WHERE id = ?`,
+        [payrollRunId]
+      );
+
+      return updatedRuns[0];
+    } catch (error) {
+      throw error;
+    }
+  }
   
   /**
    * Apply an override to a payroll item
