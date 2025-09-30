@@ -27,7 +27,7 @@ const PORT = process.env.PORT || 5000;
 
 // Middleware
 app.use(cors({
-  origin: ['https://payroll-system-liard.vercel.app', 'http://localhost:3000', 'https://nodejs.msa.medsaas.me'],
+  origin: ['https://payroll-system-liard.vercel.app','https://msa.medsaas.me/', 'http://localhost:3000', 'https://nodejs.msa.medsaas.me'],
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true
@@ -39,7 +39,7 @@ const { auditRequest } = require('./middlewares/audit');
 // Additional CORS headers for preflight requests
 app.use((req, res, next) => {
   const origin = req.headers.origin;
-  if (origin === 'https://payroll-system-liard.vercel.app') {
+  if (origin === 'https://payroll-system-liard.vercel.app' || origin === 'https://msa.medsaas.me/') {
     res.header('Access-Control-Allow-Origin', origin);
   }
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
