@@ -39,7 +39,7 @@ const { auditRequest } = require('./middlewares/audit');
 // Additional CORS headers for preflight requests
 app.use((req, res, next) => {
   const origin = req.headers.origin;
-  if (origin === 'https://payroll-system-liard.vercel.app' || origin === 'https://msa.medsaas.me/') {
+  if (origin === 'https://payroll-system-liard.vercel.app' || origin === 'https://msa.medsaas.me') {
     res.header('Access-Control-Allow-Origin', origin);
   }
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
