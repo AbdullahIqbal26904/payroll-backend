@@ -236,11 +236,23 @@ const generatePaystubPDF = async (payrollItem, periodData, options = {}) => {
         currentY += rowHeight;
         doc.rect(leftTableX, currentY, halfTableWidth, rowHeight)
            .fillAndStroke('white', colors.border);
-           
         doc.fillColor(colors.text).fontSize(8).font('Helvetica')
            .text('Vacation Pay', leftTableX + 5, currentY + 5, { width: colWidth - 5, align: 'left' })
            .text(vacationHours.toString(), leftTableX + colWidth, currentY + 5, { width: colWidth - 5, align: 'right' })
            .text(`$${vacationAmount}`, leftTableX + colWidth * 2, currentY + 5, { width: colWidth - 10, align: 'right' });
+      }
+
+      // Add paid holiday row if applicable
+      const holidayHours = payrollItem.holidayHours || payrollItem.holiday_hours || 0;
+      const holidayAmount = parseFloat(payrollItem.holidayAmount || payrollItem.holiday_amount || 0).toFixed(2);
+      if (parseFloat(holidayHours) > 0 || parseFloat(holidayAmount) > 0) {
+        currentY += rowHeight;
+        doc.rect(leftTableX, currentY, halfTableWidth, rowHeight)
+           .fillAndStroke(colors.lightGray, colors.border);
+        doc.fillColor(colors.text).fontSize(8).font('Helvetica')
+           .text('Holiday Pay', leftTableX + 5, currentY + 5, { width: colWidth - 5, align: 'left' })
+           .text(holidayHours.toString(), leftTableX + colWidth, currentY + 5, { width: colWidth - 5, align: 'right' })
+           .text(`$${holidayAmount}`, leftTableX + colWidth * 2, currentY + 5, { width: colWidth - 10, align: 'right' });
       }
       
       // We will handle the Gross Pay later to align with Net Pay
@@ -528,7 +540,7 @@ const generatePaystubPDF = async (payrollItem, periodData, options = {}) => {
       currentYtdY += ytdRowHeight;
       
       // Row 6: Holiday Hours - compact
-      const holidayHours = payrollItem.holidayHours || payrollItem.holiday_hours || 0;
+      // const holidayHours = payrollItem.holidayHours || payrollItem.holiday_hours || 0;
       doc.rect(leftTableX, currentYtdY, tableWidth, ytdRowHeight)
          .fillAndStroke(colors.lightGray, colors.border);
          
@@ -540,7 +552,7 @@ const generatePaystubPDF = async (payrollItem, periodData, options = {}) => {
       currentYtdY += ytdRowHeight;
       
       // Row 7: Holiday Amount - compact
-      const holidayAmount = parseFloat(payrollItem.holidayAmount || payrollItem.holiday_amount || 0).toFixed(2);
+      // const holidayAmount = parseFloat(payrollItem.holidayAmount || payrollItem.holiday_amount || 0).toFixed(2);
       doc.rect(leftTableX, currentYtdY, tableWidth, ytdRowHeight)
          .fillAndStroke('white', colors.border);
          
