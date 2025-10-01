@@ -534,12 +534,7 @@ const generatePaystubPDF = async (payrollItem, periodData, options = {}) => {
       doc.rect(leftTableX, currentYtdY, tableWidth, ytdRowHeight)
          .fillAndStroke('white', colors.border);
          
-      doc.fillColor(colors.text).fontSize(8).font('Helvetica')
-         .text('Vacation Amount', leftTableX + 5, currentYtdY + 4, { width: ytdColWidth - 5, align: 'left' })
-         .text(`$${vacationAmount}`, leftTableX + ytdColWidth, currentYtdY + 4, { width: ytdColWidth - 5, align: 'center' })
-         .text(`$${ytdVacationAmount}`, leftTableX + ytdColWidth * 2, currentYtdY + 4, { width: ytdColWidth - 5, align: 'right' });
       
-      currentYtdY += ytdRowHeight;
       
       // Row 6: Holiday Hours - compact
       // const holidayHours = payrollItem.holidayHours || payrollItem.holiday_hours || 0;
