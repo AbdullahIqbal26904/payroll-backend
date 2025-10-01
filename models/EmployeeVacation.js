@@ -68,7 +68,10 @@ class EmployeeVacation {
         
         // Get the inserted vacation entry
         const [vacation] = await connection.query(
-          `SELECT ev.*, 
+          `SELECT ev.id, ev.employee_id, ev.start_date, ev.end_date, 
+            ev.total_hours, 
+            COALESCE(ev.hourly_rate, e.hourly_rate) as hourly_rate,
+            ev.status, ev.created_by, ev.created_at, ev.updated_at,
             CONCAT(e.first_name, ' ', e.last_name) as employee_name,
             e.employee_type
            FROM employee_vacations ev
@@ -190,7 +193,10 @@ class EmployeeVacation {
         
         // Get updated vacation entry
         const [vacation] = await connection.query(
-          `SELECT ev.*, 
+          `SELECT ev.id, ev.employee_id, ev.start_date, ev.end_date, 
+            ev.total_hours, 
+            COALESCE(ev.hourly_rate, e.hourly_rate) as hourly_rate,
+            ev.status, ev.created_by, ev.created_at, ev.updated_at,
             CONCAT(e.first_name, ' ', e.last_name) as employee_name,
             e.employee_type
            FROM employee_vacations ev
@@ -234,7 +240,10 @@ class EmployeeVacation {
   static async getById(id) {
     try {
       const [vacation] = await db.query(
-        `SELECT ev.*, 
+        `SELECT ev.id, ev.employee_id, ev.start_date, ev.end_date, 
+          ev.total_hours, 
+          COALESCE(ev.hourly_rate, e.hourly_rate) as hourly_rate,
+          ev.status, ev.created_by, ev.created_at, ev.updated_at,
           CONCAT(e.first_name, ' ', e.last_name) as employee_name,
           e.employee_type
          FROM employee_vacations ev
@@ -257,7 +266,10 @@ class EmployeeVacation {
   static async getAll(filters = {}) {
     try {
       let query = `
-        SELECT ev.*, 
+        SELECT ev.id, ev.employee_id, ev.start_date, ev.end_date, 
+          ev.total_hours, 
+          COALESCE(ev.hourly_rate, e.hourly_rate) as hourly_rate,
+          ev.status, ev.created_by, ev.created_at, ev.updated_at,
           CONCAT(e.first_name, ' ', e.last_name) as employee_name,
           e.employee_type
         FROM employee_vacations ev
@@ -311,7 +323,10 @@ class EmployeeVacation {
   static async getByEmployeeId(employeeId) {
     try {
       const [vacations] = await db.query(
-        `SELECT ev.*, 
+        `SELECT ev.id, ev.employee_id, ev.start_date, ev.end_date, 
+          ev.total_hours, 
+          COALESCE(ev.hourly_rate, e.hourly_rate) as hourly_rate,
+          ev.status, ev.created_by, ev.created_at, ev.updated_at,
           CONCAT(e.first_name, ' ', e.last_name) as employee_name,
           e.employee_type
          FROM employee_vacations ev
@@ -337,7 +352,10 @@ class EmployeeVacation {
   static async getOverlappingVacations(startDate, endDate, employeeId = null) {
     try {
       let query = `
-        SELECT ev.*, 
+        SELECT ev.id, ev.employee_id, ev.start_date, ev.end_date, 
+          ev.total_hours, 
+          COALESCE(ev.hourly_rate, e.hourly_rate) as hourly_rate,
+          ev.status, ev.created_by, ev.created_at, ev.updated_at,
           CONCAT(e.first_name, ' ', e.last_name) as employee_name,
           e.employee_type,
           e.hourly_rate as employee_hourly_rate
