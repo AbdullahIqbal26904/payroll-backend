@@ -20,9 +20,6 @@ async function up(connection) {
     SHOW TABLES LIKE 'payroll_items'
   `);
   
-  const [payrolls] = await connection.query(`
-    SHOW TABLES LIKE 'payrolls'
-  `);
   
   // Create payroll runs table if it doesn't exist
   if (payroll_runs.length === 0) {
@@ -87,43 +84,6 @@ async function up(connection) {
   } else {
     console.log('Payroll items table already exists, skipping creation.');
   }
-  
-  // Create legacy payrolls table if it doesn't exist (for backward compatibility)
-  if (payrolls.length === 0) {
-    await connection.query(`
-      CREATE TABLE payrolls (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        employee_id VARCHAR(20),
-        pay_period_start DATE,
-        pay_period_end DATE,
-        payment_date DATE,
-        gross_salary DECIMAL(10, 2) DEFAULT 0.00,
-        social_security_employee DECIMAL(10, 2) DEFAULT 0.00,
-        social_security_employer DECIMAL(10, 2) DEFAULT 0.00,
-        medical_benefits_employee DECIMAL(10, 2) DEFAULT 0.00,
-        medical_benefits_employer DECIMAL(10, 2) DEFAULT 0.00,
-        education_levy DECIMAL(10, 2) DEFAULT 0.00,
-        net_salary DECIMAL(10, 2) DEFAULT 0.00,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-        status ENUM('pending', 'processed', 'paid') DEFAULT 'pending',
-        created_by INT,
-        
-        -- Foreign key constraints
-        FOREIGN KEY (employee_id) REFERENCES employees(id) ON DELETE CASCADE,
-        FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL,
-        
-        -- Add indexes for improved query performance
-        INDEX idx_employee_id (employee_id),
-        INDEX idx_payment_date (payment_date),
-        INDEX idx_status (status)
-      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-    `);
-    
-    console.log('Payrolls table created successfully');
-  } else {
-    console.log('Payrolls table already exists, skipping creation.');
-  }
 }
 
 /**
@@ -138,9 +98,6 @@ async function down(connection) {
   
   await connection.query('DROP TABLE IF EXISTS payroll_runs');
   console.log('Payroll runs table dropped successfully');
-  
-  await connection.query('DROP TABLE IF EXISTS payrolls');
-  console.log('Payrolls table dropped successfully');
 }
 
 module.exports = { up, down };
