@@ -35,6 +35,18 @@ class Payroll {
         
         const period = periods[0];
         
+        // Use custom dates if provided in options, otherwise use period dates from database
+        const startDate = options.periodStart || period.period_start;
+        const endDate = options.periodEnd || period.period_end;
+        
+        // Log which dates are being used for transparency
+        console.log(`Payroll calculation for period ${periodId}:`);
+        console.log(`  - CSV/Period dates: ${period.period_start} to ${period.period_end}`);
+        console.log(`  - Using dates: ${startDate} to ${endDate}`);
+        if (options.periodStart || options.periodEnd) {
+          console.log(`  - Custom dates provided: Using custom range for calculation`);
+        }
+        
         // Create a new payroll calculation record
         const [payrollRun] = await connection.query(
           `INSERT INTO payroll_runs (
@@ -53,7 +65,8 @@ class Payroll {
         
         const payrollRunId = payrollRun.insertId;
         
-        // Get all timesheet entries for this period
+        // Get all timesheet entries for this period within the date range
+        // Uses custom dates if provided, otherwise uses the period's default dates
         const [timesheetEntries] = await connection.query(
           `SELECT 
             te.*, 
@@ -63,9 +76,13 @@ class Payroll {
           LEFT JOIN 
             employees e ON te.employee_id = e.id
           WHERE 
-            te.period_id = ?`,
-          [periodId]
+            te.period_id = ?
+            AND te.work_date >= ?
+            AND te.work_date <= ?`,
+          [periodId, startDate, endDate]
         );
+        
+        console.log(`Found ${timesheetEntries.length} timesheet entries between ${startDate} and ${endDate}`);
         
         // Group entries by employee ID (primary) or name (fallback)
         const employeeHours = {};
@@ -130,6 +147,7 @@ class Payroll {
           console.log(`Employee data found: ${employeeData.first_name} ${employeeData.last_name}, Salary: ${salaryToLog}, Rate: ${rateToLog}, Frequency: ${employeeData.payment_frequency}`);
           
           // Get vacation entries for this employee during this period
+          // Uses custom dates if provided, otherwise uses period dates
           let vacationData = {
             vacationHours: 0,
             vacationPay: 0,
@@ -139,8 +157,8 @@ class Payroll {
           try {
             vacationData = await EmployeeVacation.calculateVacationForPeriod(
               employeeDbId, 
-              period.period_start, 
-              period.period_end, 
+              startDate, 
+              endDate, 
               employeeData
             );
             
@@ -158,6 +176,7 @@ class Payroll {
           }
           
           // Get sick/maternity leave entries for this employee during this period
+          // Uses custom dates if provided, otherwise uses period dates
           let leaveData = {
             leaveHours: 0,
             leaveAmount: 0,
@@ -168,8 +187,8 @@ class Payroll {
           try {
             leaveData = await EmployeeLeave.calculateLeaveForPeriod(
               employeeDbId, 
-              period.period_start, 
-              period.period_end, 
+              startDate, 
+              endDate, 
               employeeData
             );
             
@@ -187,6 +206,7 @@ class Payroll {
           }
           
           // Get paid public holidays for this employee during this period
+          // Uses custom dates if provided, otherwise uses period dates
           let holidayData = {
             holidayHours: 0,
             holidayPay: 0,
@@ -196,8 +216,8 @@ class Payroll {
           try {
             holidayData = await this.calculateHolidayPayForPeriod(
               employeeDbId,
-              period.period_start,
-              period.period_end,
+              startDate,
+              endDate,
               employeeData
             );
             
@@ -653,19 +673,27 @@ class Payroll {
           });
         }
         
-        // Update the payroll run status
+        // Update the payroll run status and store custom dates if they were used
+        // Check if custom dates differ from period defaults
+        const customStartDate = (options.periodStart && options.periodStart !== period.period_start) ? startDate : null;
+        const customEndDate = (options.periodEnd && options.periodEnd !== period.period_end) ? endDate : null;
+        
         await connection.query(
           `UPDATE payroll_runs SET 
             status = ?, 
             total_employees = ?,
             total_gross = (SELECT SUM(gross_pay) FROM payroll_items WHERE payroll_run_id = ?),
-            total_net = (SELECT SUM(net_pay) FROM payroll_items WHERE payroll_run_id = ?)
+            total_net = (SELECT SUM(net_pay) FROM payroll_items WHERE payroll_run_id = ?),
+            custom_period_start = ?,
+            custom_period_end = ?
           WHERE id = ?`,
           [
             errors.length > 0 ? 'completed_with_errors' : 'completed',
             payrollItems.length,
             payrollRunId,
             payrollRunId,
+            customStartDate,
+            customEndDate,
             payrollRunId
           ]
         );

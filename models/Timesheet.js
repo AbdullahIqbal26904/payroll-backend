@@ -117,7 +117,20 @@ class Timesheet {
         `SELECT 
           tp.*,
           u.name as created_by_name,
-          (SELECT COUNT(*) FROM timesheet_entries WHERE period_id = tp.id) as entry_count
+          (SELECT COUNT(*) FROM timesheet_entries WHERE period_id = tp.id) as entry_count,
+          (SELECT COUNT(*) FROM payroll_runs 
+           WHERE period_id = tp.id 
+           AND (custom_period_start IS NOT NULL OR custom_period_end IS NOT NULL)) as custom_date_runs_count,
+          (SELECT GROUP_CONCAT(
+            CONCAT(
+              'Run #', pr.id, 
+              ' (', COALESCE(DATE_FORMAT(pr.custom_period_start, '%Y-%m-%d'), 'default'), 
+              ' to ', COALESCE(DATE_FORMAT(pr.custom_period_end, '%Y-%m-%d'), 'default'), ')'
+            ) SEPARATOR '; '
+          )
+          FROM payroll_runs pr
+          WHERE pr.period_id = tp.id 
+          AND (pr.custom_period_start IS NOT NULL OR pr.custom_period_end IS NOT NULL)) as custom_date_runs_info
         FROM 
           timesheet_periods tp
         LEFT JOIN 
@@ -128,7 +141,15 @@ class Timesheet {
         [limit, offset]
       );
       
-      return periods;
+      // Process periods to add hasCustomDateRuns flag and format the info
+      const processedPeriods = periods.map(period => ({
+        ...period,
+        hasCustomDateRuns: period.custom_date_runs_count > 0,
+        customDateRunsCount: period.custom_date_runs_count || 0,
+        customDateRunsInfo: period.custom_date_runs_info || null
+      }));
+      
+      return processedPeriods;
     } catch (error) {
       throw error;
     }
@@ -144,7 +165,20 @@ class Timesheet {
       const [periods] = await db.query(
         `SELECT 
           tp.*,
-          u.name as created_by_name
+          u.name as created_by_name,
+          (SELECT COUNT(*) FROM payroll_runs 
+           WHERE period_id = tp.id 
+           AND (custom_period_start IS NOT NULL OR custom_period_end IS NOT NULL)) as custom_date_runs_count,
+          (SELECT GROUP_CONCAT(
+            CONCAT(
+              'Run #', pr.id, 
+              ' (', COALESCE(DATE_FORMAT(pr.custom_period_start, '%Y-%m-%d'), 'default'), 
+              ' to ', COALESCE(DATE_FORMAT(pr.custom_period_end, '%Y-%m-%d'), 'default'), ')'
+            ) SEPARATOR '; '
+          )
+          FROM payroll_runs pr
+          WHERE pr.period_id = tp.id 
+          AND (pr.custom_period_start IS NOT NULL OR pr.custom_period_end IS NOT NULL)) as custom_date_runs_info
         FROM 
           timesheet_periods tp
         LEFT JOIN 
@@ -154,7 +188,18 @@ class Timesheet {
         [periodId]
       );
       
-      return periods[0] || null;
+      if (periods.length === 0) {
+        return null;
+      }
+      
+      const period = periods[0];
+      
+      // Add processed flags
+      period.hasCustomDateRuns = period.custom_date_runs_count > 0;
+      period.customDateRunsCount = period.custom_date_runs_count || 0;
+      period.customDateRunsInfo = period.custom_date_runs_info || null;
+      
+      return period;
     } catch (error) {
       throw error;
     }

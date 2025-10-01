@@ -320,7 +320,7 @@ exports.getTimesheetPeriod = async (req, res) => {
  */
 exports.calculatePayroll = async (req, res) => {
   try {
-    const { periodId, payDate } = req.body;
+    const { periodId, payDate, periodStart, periodEnd } = req.body;
     
     if (!periodId) {
       return res.status(400).json(formatError({
@@ -328,12 +328,24 @@ exports.calculatePayroll = async (req, res) => {
       }));
     }
     
+    // Build options object with optional custom period dates
+    const options = {
+      payDate: payDate ? new Date(payDate) : new Date()
+    };
+    
+    // Add custom period dates if provided
+    if (periodStart) {
+      options.periodStart = new Date(periodStart);
+    }
+    
+    if (periodEnd) {
+      options.periodEnd = new Date(periodEnd);
+    }
+    
     // Call the Payroll model to perform calculations
     const result = await Payroll.calculateForPeriod(
       periodId,
-      {
-        payDate: payDate ? new Date(payDate) : new Date()
-      },
+      options,
       req.user.id
     );
     
@@ -502,10 +514,16 @@ exports.downloadPaystub = async (req, res) => {
     // Loan functionality removed
 
     // Prepare period data for PDF
+    // Use custom dates if they were used during calculation, otherwise use default period dates
+    const actualStartDate = payrollRun.custom_period_start || payrollRun.period_start;
+    const actualEndDate = payrollRun.custom_period_end || payrollRun.period_end;
+    
     const periodData = {
-      periodStart: payrollRun.period_start ? new Date(payrollRun.period_start).toLocaleDateString() : 'N/A',
-      periodEnd: payrollRun.period_end ? new Date(payrollRun.period_end).toLocaleDateString() : 'N/A',
-      payDate: payrollRun.pay_date ? new Date(payrollRun.pay_date).toLocaleDateString() : new Date().toLocaleDateString()
+      periodStart: actualStartDate ? new Date(actualStartDate).toLocaleDateString() : 'N/A',
+      periodEnd: actualEndDate ? new Date(actualEndDate).toLocaleDateString() : 'N/A',
+      payDate: payrollRun.pay_date ? new Date(payrollRun.pay_date).toLocaleDateString() : new Date().toLocaleDateString(),
+      // Include flag to indicate if custom dates were used
+      usedCustomDates: !!(payrollRun.custom_period_start || payrollRun.custom_period_end)
     };
     
     // Fetch employee details from database
