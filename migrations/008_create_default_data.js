@@ -18,7 +18,7 @@ async function up(connection) {
   try {
     // Check if admin user already exists
     const [users] = await connection.query(`
-      SELECT id FROM users WHERE email = 'admin@payroll.com'
+      SELECT id FROM users WHERE email = 'info@medsaas.com'
     `);
     
     // Create default admin user if not exists
@@ -27,7 +27,7 @@ async function up(connection) {
       
       await connection.query(`
         INSERT INTO users (name, email, password, role)
-        VALUES ('System Admin', 'admin@payroll.com', ?, 'admin')
+        VALUES ('System Admin', 'info@medsaas.com', ?, 'admin')
       `, [hashedPassword]);
       
       console.log('Default admin user created successfully');
@@ -127,7 +127,7 @@ async function down(connection) {
   try {
     // Remove default admin user
     await connection.query(`
-      DELETE FROM users WHERE email = 'admin@payroll.com'
+      DELETE FROM users WHERE email = 'info@medsaas.com'
     `);
     console.log('Default admin user removed successfully');
     
