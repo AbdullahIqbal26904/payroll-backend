@@ -183,9 +183,13 @@ const generatePaystubPDF = async (payrollItem, periodData, options = {}) => {
       const vacationHours = payrollItem.vacationHours || payrollItem.vacation_hours || 0;
       const vacationAmount = parseFloat(payrollItem.vacationAmount || payrollItem.vacation_amount || 0).toFixed(2);
       
-      // Calculate regular earnings (gross pay minus overtime and vacation)
+      // Get holiday hours and pay
+      const holidayHours = payrollItem.holidayHours || payrollItem.holiday_hours || 0;
+      const holidayAmount = parseFloat(payrollItem.holidayAmount || payrollItem.holiday_amount || 0).toFixed(2);
+      
+      // Calculate regular earnings (gross pay minus overtime, vacation, and holiday pay)
       const grossPay = parseFloat(payrollItem.grossPay || payrollItem.gross_pay || 0).toFixed(2);
-      const regularEarnings = (parseFloat(grossPay) - parseFloat(overtimeAmount) - parseFloat(vacationAmount)).toFixed(2);
+      const regularEarnings = (parseFloat(grossPay) - parseFloat(overtimeAmount) - parseFloat(vacationAmount) - parseFloat(holidayAmount)).toFixed(2);
       
       // Setup for earnings detail rows - reduced height for compact layout
       const rowHeight = 18; // Smaller row height
@@ -243,8 +247,6 @@ const generatePaystubPDF = async (payrollItem, periodData, options = {}) => {
       }
 
       // Add paid holiday row if applicable
-      const holidayHours = payrollItem.holidayHours || payrollItem.holiday_hours || 0;
-      const holidayAmount = parseFloat(payrollItem.holidayAmount || payrollItem.holiday_amount || 0).toFixed(2);
       if (parseFloat(holidayHours) > 0 || parseFloat(holidayAmount) > 0) {
         currentY += rowHeight;
         doc.rect(leftTableX, currentY, halfTableWidth, rowHeight)

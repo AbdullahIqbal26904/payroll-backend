@@ -591,7 +591,9 @@ class Payroll {
               ytd_net_pay: ytdData.ytd_net_pay + finalNetPay,
               ytd_hours_worked: ytdData.ytd_hours_worked + employeeInfo.totalHours,
               ytd_vacation_hours: (ytdData.ytd_vacation_hours || 0) + vacationHours,
-              ytd_vacation_amount: (ytdData.ytd_vacation_amount || 0) + vacationAmount
+              ytd_vacation_amount: (ytdData.ytd_vacation_amount || 0) + vacationAmount,
+              ytd_holiday_hours: (ytdData.ytd_holiday_hours || 0) + (holidayData.holidayHours || 0),
+              ytd_holiday_amount: (ytdData.ytd_holiday_amount || 0) + (holidayData.holidayPay || 0)
             };
             
             // Update payroll item with YTD totals
@@ -606,7 +608,9 @@ class Payroll {
                 ytd_net_pay = ?,
                 ytd_hours_worked = ?,
                 ytd_vacation_hours = ?,
-                ytd_vacation_amount = ?
+                ytd_vacation_amount = ?,
+                ytd_holiday_hours = ?,
+                ytd_holiday_amount = ?
               WHERE id = ?`,
               [
                 updatedYtdData.ytd_gross_pay,
@@ -619,6 +623,8 @@ class Payroll {
                 updatedYtdData.ytd_hours_worked,
                 updatedYtdData.ytd_vacation_hours,
                 updatedYtdData.ytd_vacation_amount,
+                updatedYtdData.ytd_holiday_hours,
+                updatedYtdData.ytd_holiday_amount,
                 payrollItemId
               ]
             );
@@ -974,8 +980,18 @@ class Payroll {
         // Monthly salary / (52 weeks * 40 hours / 12 months)
         hourlyRate = (monthlySalary * 12) / (52 * 40);
       } else if (employeeData.employee_type === 'private_duty_nurse') {
-        // For private duty nurses, use the day weekday rate as base rate for holidays
-        hourlyRate = 35.00; // Default rate, should be overridden by settings
+        // For private duty nurses, get the rate from payroll settings
+        // Use the highest rate (night rate) as the holiday rate to be fair to the employee
+        const [settings] = await db.query('SELECT * FROM payroll_settings LIMIT 1');
+        const payrollSettings = settings[0];
+        
+        if (payrollSettings) {
+          // Use the night rate as it's typically the highest rate for private duty nurses
+          hourlyRate = payrollSettings.private_duty_nurse_night_all || 40.00;
+        } else {
+          // Fallback to default night rate if no settings found
+          hourlyRate = 40.00;
+        }
       } else {
         // For hourly employees, use their standard rate
         hourlyRate = employeeData.hourly_rate !== undefined ? 
