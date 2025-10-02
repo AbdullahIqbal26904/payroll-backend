@@ -18,7 +18,7 @@ async function up(connection) {
   try {
     // Check if admin user already exists
     const [users] = await connection.query(`
-      SELECT id FROM users WHERE email = 'info@medsaas.com'
+      SELECT id FROM users WHERE email = 'info@msa.medsaas.me'
     `);
     
     // Create default admin user if not exists
