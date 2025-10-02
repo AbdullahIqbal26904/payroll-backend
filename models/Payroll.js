@@ -269,7 +269,7 @@ class Payroll {
               } else if (employeeData.payment_frequency === 'Semi-Monthly') {
                 standardHoursPerPeriod = employeeStandardHours * (4.33 / 2); // Half month based on employee's weekly hours
               } else { // Monthly
-                standardHoursPerPeriod = employeeStandardHours * 4; // 4 weeks per month based on employee's weekly hours
+                standardHoursPerPeriod = employeeStandardHours * 4.33; // 4.33 weeks per month (consistent with hourly rate calculation)
               }
               
               // Get vacation and leave hours for this employee
@@ -1015,8 +1015,12 @@ class Payroll {
                               employeeData.salary_amount : 
                               (employeeData.salary !== undefined ? employeeData.salary : 0);
         
-        // Monthly salary / (52 weeks * 40 hours / 12 months)
-        hourlyRate = (monthlySalary * 12) / (52 * 40);
+        // Calculate Total Monthly Hours = Employee's weekly standard hours × 4.33 weeks per month
+        const weeklyHours = employeeData.standard_hours || 40;
+        const monthlyHours = weeklyHours * 4.33; // 4.33 weeks per month average
+        
+        // Hourly Rate = Monthly Salary / Total Monthly Hours
+        hourlyRate = monthlySalary / monthlyHours;
       } else if (employeeData.employee_type === 'private_duty_nurse') {
         // For private duty nurses, get the rate from payroll settings
         // Use the highest rate (night rate) as the holiday rate to be fair to the employee
