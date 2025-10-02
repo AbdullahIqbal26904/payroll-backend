@@ -41,11 +41,11 @@ class Payroll {
         const endDate = options.periodEnd || period.period_end;
         
         // Log which dates are being used for transparency
-        console.log(`Payroll calculation for period ${periodId}:`);
-        console.log(`  - CSV/Period dates: ${period.period_start} to ${period.period_end}`);
-        console.log(`  - Using dates: ${startDate} to ${endDate}`);
+        // console.log(`Payroll calculation for period ${periodId}:`);
+        // console.log(`  - CSV/Period dates: ${period.period_start} to ${period.period_end}`);
+        // console.log(`  - Using dates: ${startDate} to ${endDate}`);
         if (options.periodStart || options.periodEnd) {
-          console.log(`  - Custom dates provided: Using custom range for calculation`);
+          // console.log(`  - Custom dates provided: Using custom range for calculation`);
         }
         
         // Create a new payroll calculation record
@@ -83,7 +83,7 @@ class Payroll {
           [periodId, startDate, endDate]
         );
         
-        console.log(`Found ${timesheetEntries.length} timesheet entries between ${startDate} and ${endDate}`);
+        // console.log(`Found ${timesheetEntries.length} timesheet entries between ${startDate} and ${endDate}`);
         
         // Group entries by employee ID (primary) or name (fallback)
         const employeeHours = {};
@@ -139,13 +139,13 @@ class Payroll {
             continue;
           }
           
-          console.log(`Processing employee: ${employeeData.first_name} ${employeeData.last_name} (ID: ${employeeData.id}), Total Hours: ${employeeInfo.totalHours}`);
+          // console.log(`Processing employee: ${employeeData.first_name} ${employeeData.last_name} (ID: ${employeeData.id}), Total Hours: ${employeeInfo.totalHours}`);
           // Log employee data, ensuring we check both possible field names
           const salaryToLog = employeeData.salary_amount !== undefined ? employeeData.salary_amount : 
                              (employeeData.salary !== undefined ? employeeData.salary : '0.00');
           const rateToLog = employeeData.hourly_rate !== undefined ? employeeData.hourly_rate : 
                            (employeeData.rate !== undefined ? employeeData.rate : '0.00');
-          console.log(`Employee data found: ${employeeData.first_name} ${employeeData.last_name}, Salary: ${salaryToLog}, Rate: ${rateToLog}, Frequency: ${employeeData.payment_frequency}`);
+          // console.log(`Employee data found: ${employeeData.first_name} ${employeeData.last_name}, Salary: ${salaryToLog}, Rate: ${rateToLog}, Frequency: ${employeeData.payment_frequency}`);
           
           // Get vacation entries for this employee during this period
           // Uses custom dates if provided, otherwise uses period dates
@@ -164,8 +164,8 @@ class Payroll {
             );
             
             if (vacationData.vacationHours > 0) {
-              console.log(`Found ${vacationData.vacationHours} vacation hours for ${employeeData.first_name} ${employeeData.last_name}`);
-              console.log(`Vacation pay: $${vacationData.vacationPay}`);
+              // console.log(`Found ${vacationData.vacationHours} vacation hours for ${employeeData.first_name} ${employeeData.last_name}`);
+              // console.log(`Vacation pay: $${vacationData.vacationPay}`);
             }
           } catch (vacationError) {
             console.error(`Error retrieving vacation data for employee ${employeeDbId}:`, vacationError);
@@ -194,8 +194,8 @@ class Payroll {
             );
             
             if (leaveData.leaveHours > 0) {
-              console.log(`Found ${leaveData.leaveHours} ${leaveData.leaveType} leave hours for ${employeeData.first_name} ${employeeData.last_name}`);
-              console.log(`Leave pay: $${leaveData.leaveAmount}`);
+              // console.log(`Found ${leaveData.leaveHours} ${leaveData.leaveType} leave hours for ${employeeData.first_name} ${employeeData.last_name}`);
+              // console.log(`Leave pay: $${leaveData.leaveAmount}`);
             }
           } catch (leaveError) {
             console.error(`Error retrieving leave data for employee ${employeeDbId}:`, leaveError);
@@ -223,9 +223,9 @@ class Payroll {
             );
             
             if (holidayData.holidayHours > 0) {
-              console.log(`Found ${holidayData.holidayHours} holiday hours for ${employeeData.first_name} ${employeeData.last_name}`);
-              console.log(`Holiday pay: $${holidayData.holidayPay}`);
-              console.log(`Holidays: ${holidayData.holidays.map(h => h.name).join(', ')}`);
+              // console.log(`Found ${holidayData.holidayHours} holiday hours for ${employeeData.first_name} ${employeeData.last_name}`);
+              // console.log(`Holiday pay: $${holidayData.holidayPay}`);
+              // console.log(`Holidays: ${holidayData.holidays.map(h => h.name).join(', ')}`);
             }
           } catch (holidayError) {
             console.error(`Error retrieving holiday data for employee ${employeeDbId}:`, holidayError);
@@ -242,7 +242,7 @@ class Payroll {
           
           // Determine pay type and calculate gross pay
           const employeeType = employeeData.employee_type || 'hourly';
-          console.log(`Processing employee type: ${employeeType} for ${employeeData.first_name} ${employeeData.last_name}`);
+          // console.log(`Processing employee type: ${employeeType} for ${employeeData.first_name} ${employeeData.last_name}`);
           
           switch (employeeType) {
             case 'salary':
@@ -285,11 +285,11 @@ class Payroll {
               if (totalWorkedHours < standardHoursPerPeriod) {
                 const proratedFactor = totalWorkedHours / standardHoursPerPeriod;
                 grossPay = baseSalaryForPeriod * proratedFactor;
-                console.log(`Prorating salary: ${employeeInfo.totalHours} worked hours + ${vacationHoursForPeriod} vacation hours + ${leaveHoursForPeriod} leave hours = ${totalWorkedHours} total hours out of ${standardHoursPerPeriod} standard hours`);
-                console.log(`Proration factor: ${proratedFactor.toFixed(4)}, Base salary: ${baseSalaryForPeriod}, Prorated salary: ${grossPay}`);
+                // console.log(`Prorating salary: ${employeeInfo.totalHours} worked hours + ${vacationHoursForPeriod} vacation hours + ${leaveHoursForPeriod} leave hours = ${totalWorkedHours} total hours out of ${standardHoursPerPeriod} standard hours`);
+                // console.log(`Proration factor: ${proratedFactor.toFixed(4)}, Base salary: ${baseSalaryForPeriod}, Prorated salary: ${grossPay}`);
               } else {
                 grossPay = baseSalaryForPeriod;
-                console.log(`No proration needed: ${employeeInfo.totalHours} worked hours + ${vacationHoursForPeriod} vacation hours + ${leaveHoursForPeriod} leave hours = ${totalWorkedHours} total hours meets or exceeds ${standardHoursPerPeriod} standard hours`);
+                // console.log(`No proration needed: ${employeeInfo.totalHours} worked hours + ${vacationHoursForPeriod} vacation hours + ${leaveHoursForPeriod} leave hours = ${totalWorkedHours} total hours meets or exceeds ${standardHoursPerPeriod} standard hours`);
               }
               
               // For salaried employees, vacation hours are counted as worked hours
@@ -304,7 +304,7 @@ class Payroll {
               
               // Log vacation hours if any
               if (vacationData.vacationHours > 0) {
-                console.log(`Salaried employee vacation: ${vacationData.vacationHours} hours (included in worked hours for proration)`);
+                // console.log(`Salaried employee vacation: ${vacationData.vacationHours} hours (included in worked hours for proration)`);
               }
               
               // For salaried employees, holiday pay is extra (added to salary)
@@ -312,12 +312,12 @@ class Payroll {
               
               // Log holiday hours if any
               if (holidayData.holidayHours > 0) {
-                console.log(`Salaried employee holidays: ${holidayData.holidayHours} hours with pay $${holidayData.holidayPay}`);
-                console.log(`New total with holiday pay: $${grossPay}`);
+                // console.log(`Salaried employee holidays: ${holidayData.holidayHours} hours with pay $${holidayData.holidayPay}`);
+                // console.log(`New total with holiday pay: $${grossPay}`);
               }
               
               payType = 'salary';
-              console.log(`Calculated salary pay: Base ${salaryAmount}, Holiday Pay ${holidayData.holidayPay}, Total ${grossPay}`);
+              // console.log(`Calculated salary pay: Base ${salaryAmount}, Holiday Pay ${holidayData.holidayPay}, Total ${grossPay}`);
               break;
               
             case 'private_duty_nurse':
@@ -388,7 +388,7 @@ class Payroll {
                 
                 const dailyPay = day.totalHours * rate;
                 totalNursePay += dailyPay;
-                console.log(`Private duty nurse pay for ${date.toLocaleDateString()}: ${day.totalHours} hours at $${rate}/hr = $${dailyPay}`);
+                // console.log(`Private duty nurse pay for ${date.toLocaleDateString()}: ${day.totalHours} hours at $${rate}/hr = $${dailyPay}`);
               }
               
               // Add vacation and holiday pay for private duty nurses
@@ -396,18 +396,18 @@ class Payroll {
               payType = 'private_duty_nurse';
               
               if (vacationData.vacationHours > 0) {
-                console.log(`Private duty nurse vacation pay: ${vacationData.vacationHours} hours = $${vacationData.vacationPay}`);
+                // console.log(`Private duty nurse vacation pay: ${vacationData.vacationHours} hours = $${vacationData.vacationPay}`);
               }
               
               if (leaveData.leaveHours > 0) {
-                console.log(`Private duty nurse ${leaveData.leaveType} leave pay: ${leaveData.leaveHours} hours = $${leaveData.leaveAmount}`);
+                // console.log(`Private duty nurse ${leaveData.leaveType} leave pay: ${leaveData.leaveHours} hours = $${leaveData.leaveAmount}`);
               }
               
               if (holidayData.holidayHours > 0) {
-                console.log(`Private duty nurse holiday pay: ${holidayData.holidayHours} hours = $${holidayData.holidayPay}`);
+                // console.log(`Private duty nurse holiday pay: ${holidayData.holidayHours} hours = $${holidayData.holidayPay}`);
               }
               
-              console.log(`Total nurse pay including vacation and holidays: $${grossPay}`);
+              // console.log(`Total nurse pay including vacation and holidays: $${grossPay}`);
               break;
               
             case 'hourly':
@@ -445,15 +445,15 @@ class Payroll {
               grossPay = regularPay + overtimePay + vacationData.vacationPay + leaveData.leaveAmount + holidayData.holidayPay;
               payType = 'hourly';
               
-              console.log(`Using hourly rate: ${hourlyRate} for calculation`);
-              console.log(`Regular hours: ${regularHours} at ${hourlyRate}/hr = ${regularPay}`);
-              console.log(`Overtime hours: ${overtimeHours} at ${hourlyRate * 1.5}/hr = ${overtimePay}`);
-              console.log(`Vacation hours: ${vacationData.vacationHours} with pay = ${vacationData.vacationPay}`);
+              // console.log(`Using hourly rate: ${hourlyRate} for calculation`);
+              // console.log(`Regular hours: ${regularHours} at ${hourlyRate}/hr = ${regularPay}`);
+              // console.log(`Overtime hours: ${overtimeHours} at ${hourlyRate * 1.5}/hr = ${overtimePay}`);
+              // console.log(`Vacation hours: ${vacationData.vacationHours} with pay = ${vacationData.vacationPay}`);
               if (leaveData.leaveHours > 0) {
-                console.log(`${leaveData.leaveType} leave hours: ${leaveData.leaveHours} with pay = ${leaveData.leaveAmount}`);
+                // console.log(`${leaveData.leaveType} leave hours: ${leaveData.leaveHours} with pay = ${leaveData.leaveAmount}`);
               }
-              console.log(`Holiday hours: ${holidayData.holidayHours} with pay = ${holidayData.holidayPay}`);
-              console.log(`Total hourly pay: ${grossPay} (regular + overtime + vacation + leave + holiday)`);
+              // console.log(`Holiday hours: ${holidayData.holidayHours} with pay = ${holidayData.holidayPay}`);
+              // console.log(`Total hourly pay: ${grossPay} (regular + overtime + vacation + leave + holiday)`);
               break;
           }
           
@@ -549,7 +549,7 @@ class Payroll {
             const activeLoans = await EmployeeLoan.getActiveLoansForEmployee(employeeDbId);
             
             if (activeLoans.length > 0) {
-              console.log(`Found ${activeLoans.length} active loans for employee ${employeeDbId}`);
+              // console.log(`Found ${activeLoans.length} active loans for employee ${employeeDbId}`);
               
               for (const loan of activeLoans) {
                 const installment = parseFloat(loan.installment_amount);
@@ -704,7 +704,7 @@ class Payroll {
         // Update timesheet period status to 'processed' after successful payroll calculation
         try {
           await Timesheet.updatePeriodStatus(periodId, 'processed');
-          console.log(`Timesheet period ${periodId} status updated to 'processed'`);
+          // console.log(`Timesheet period ${periodId} status updated to 'processed'`);
         } catch (statusError) {
           console.error('Error updating timesheet period status:', statusError);
           // Don't fail the entire operation if status update fails
@@ -1504,7 +1504,7 @@ class Payroll {
       if (newStatus === 'finalized' && updatedRun.period_id) {
         try {
           await Timesheet.updatePeriodStatus(updatedRun.period_id, 'finalized');
-          console.log(`Timesheet period ${updatedRun.period_id} status updated to 'finalized'`);
+          // console.log(`Timesheet period ${updatedRun.period_id} status updated to 'finalized'`);
         } catch (statusError) {
           console.error('Error updating timesheet period status:', statusError);
           // Don't fail the entire operation if status update fails
