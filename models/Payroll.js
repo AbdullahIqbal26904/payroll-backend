@@ -3,6 +3,7 @@ const EmployeeLoan = require('./EmployeeLoan');
 const EmployeeVacation = require('./EmployeeVacation');
 const EmployeeLeave = require('./EmployeeLeave');
 const PublicHoliday = require('./PublicHoliday');
+const Timesheet = require('./Timesheet');
 
 /**
  * @class Payroll
@@ -699,6 +700,15 @@ class Payroll {
         );
         
         await connection.commit();
+        
+        // Update timesheet period status to 'processed' after successful payroll calculation
+        try {
+          await Timesheet.updatePeriodStatus(periodId, 'processed');
+          console.log(`Timesheet period ${periodId} status updated to 'processed'`);
+        } catch (statusError) {
+          console.error('Error updating timesheet period status:', statusError);
+          // Don't fail the entire operation if status update fails
+        }
         
         return {
           payrollRunId,
@@ -1484,7 +1494,20 @@ class Payroll {
         [payrollRunId]
       );
 
-      return updatedRuns[0];
+      const updatedRun = updatedRuns[0];
+
+      // Update timesheet period status to 'finalized' when payroll is finalized
+      if (newStatus === 'finalized' && updatedRun.period_id) {
+        try {
+          await Timesheet.updatePeriodStatus(updatedRun.period_id, 'finalized');
+          console.log(`Timesheet period ${updatedRun.period_id} status updated to 'finalized'`);
+        } catch (statusError) {
+          console.error('Error updating timesheet period status:', statusError);
+          // Don't fail the entire operation if status update fails
+        }
+      }
+
+      return updatedRun;
     } catch (error) {
       throw error;
     }

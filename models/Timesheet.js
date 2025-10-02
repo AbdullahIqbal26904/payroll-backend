@@ -204,6 +204,36 @@ class Timesheet {
       throw error;
     }
   }
+
+  /**
+   * Update timesheet period status
+   * @param {number} periodId - Period ID
+   * @param {string} status - New status ('pending', 'processed', 'finalized')
+   * @returns {Promise<Object>} Updated period
+   */
+  static async updatePeriodStatus(periodId, status) {
+    try {
+      // Validate status
+      const validStatuses = ['pending', 'processed', 'finalized'];
+      if (!validStatuses.includes(status)) {
+        throw new Error(`Invalid status. Must be one of: ${validStatuses.join(', ')}`);
+      }
+
+      // Update the status
+      await db.query(
+        `UPDATE timesheet_periods 
+         SET status = ?, updated_at = NOW() 
+         WHERE id = ?`,
+        [status, periodId]
+      );
+
+      // Return the updated period
+      return await this.getPeriodById(periodId);
+    } catch (error) {
+      console.error('Error updating timesheet period status:', error);
+      throw error;
+    }
+  }
 }
 
 module.exports = Timesheet;
