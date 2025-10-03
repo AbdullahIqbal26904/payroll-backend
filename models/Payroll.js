@@ -120,6 +120,13 @@ class Payroll {
           const employeeDbId = employeeInfo.employeeDbId;
           let employeeData = null;
           
+          // Initialize payroll calculation variables at the start of the loop
+          let grossPay = 0;
+          let payType = 'unknown';
+          let regularHours = 0;
+          let overtimeHours = 0;
+          let overtimeAmount = 0;
+          
           if (employeeDbId) {
             const [employees] = await connection.query(
               `SELECT * FROM employees WHERE id = ?`,
@@ -236,10 +243,6 @@ class Payroll {
             });
           }
           
-          // Initialize payroll item data
-          let grossPay = 0;
-          let payType = 'unknown';
-          
           // Determine pay type and calculate gross pay
           const employeeType = employeeData.employee_type || 'hourly';
           // console.log(`Processing employee type: ${employeeType} for ${employeeData.first_name} ${employeeData.last_name}`);
@@ -276,20 +279,44 @@ class Payroll {
               const vacationHoursForPeriod = vacationData.vacationHours || 0;
               const leaveHoursForPeriod = leaveData.leaveHours || 0;
               
-              // Get total hours including worked hours, vacation hours, and leave hours
-              // For salaried employees, both vacation and leave hours should count as worked hours
-              const totalWorkedHours = employeeInfo.totalHours + vacationHoursForPeriod + leaveHoursForPeriod;
+              // Calculate actual worked hours (timesheet hours only, without vacation/leave)
+              const actualWorkedHours = employeeInfo.totalHours;
               
-              // Prorate salary based on total hours (worked + vacation) vs expected hours
+              // Calculate regular and overtime hours for salaried employees
+              // Regular hours: up to the standard hours for the period
+              // Overtime hours: any hours worked beyond the standard
+              regularHours = Math.min(actualWorkedHours, standardHoursPerPeriod);
+              overtimeHours = Math.max(0, actualWorkedHours - standardHoursPerPeriod);
+              
+              // Get total hours including worked hours, vacation hours, and leave hours
+              // For salaried employees, both vacation and leave hours should count as worked hours for proration
+              const totalWorkedHours = actualWorkedHours + vacationHoursForPeriod + leaveHoursForPeriod;
+              
+              // Calculate hourly rate for overtime calculation
+              // Hourly Rate = Monthly Salary / Total Monthly Hours
+              const weeklyHours = employeeStandardHours;
+              const monthlyHours = weeklyHours * 4.33; // 4.33 weeks per month average
+              const salaryHourlyRate = salaryAmount / monthlyHours;
+              
+              // Prorate salary based on total hours (worked + vacation + leave) vs expected hours
               // Only prorate if total hours is less than standard hours
               if (totalWorkedHours < standardHoursPerPeriod) {
                 const proratedFactor = totalWorkedHours / standardHoursPerPeriod;
                 grossPay = baseSalaryForPeriod * proratedFactor;
-                // console.log(`Prorating salary: ${employeeInfo.totalHours} worked hours + ${vacationHoursForPeriod} vacation hours + ${leaveHoursForPeriod} leave hours = ${totalWorkedHours} total hours out of ${standardHoursPerPeriod} standard hours`);
-                // console.log(`Proration factor: ${proratedFactor.toFixed(4)}, Base salary: ${baseSalaryForPeriod}, Prorated salary: ${grossPay}`);
+                console.log(`Prorating salary: ${actualWorkedHours} worked hours + ${vacationHoursForPeriod} vacation hours + ${leaveHoursForPeriod} leave hours = ${totalWorkedHours} total hours out of ${standardHoursPerPeriod} standard hours`);
+                console.log(`Proration factor: ${proratedFactor.toFixed(4)}, Base salary: ${baseSalaryForPeriod}, Prorated salary: ${grossPay}`);
               } else {
+                // No proration needed - pay full salary
                 grossPay = baseSalaryForPeriod;
-                // console.log(`No proration needed: ${employeeInfo.totalHours} worked hours + ${vacationHoursForPeriod} vacation hours + ${leaveHoursForPeriod} leave hours = ${totalWorkedHours} total hours meets or exceeds ${standardHoursPerPeriod} standard hours`);
+                console.log(`No proration: ${actualWorkedHours} worked hours + ${vacationHoursForPeriod} vacation hours + ${leaveHoursForPeriod} leave hours = ${totalWorkedHours} total hours meets or exceeds ${standardHoursPerPeriod} standard hours`);
+              }
+              
+              // Calculate overtime pay for hours worked beyond standard hours
+              // Overtime is paid at 1.5x the hourly rate
+              if (overtimeHours > 0) {
+                overtimeAmount = overtimeHours * salaryHourlyRate * 1.5;
+                grossPay += overtimeAmount;
+                console.log(`Salaried employee overtime: ${overtimeHours} hours at $${(salaryHourlyRate * 1.5).toFixed(2)}/hr = $${overtimeAmount.toFixed(2)}`);
               }
               
               // For salaried employees, vacation hours are counted as worked hours
@@ -304,7 +331,7 @@ class Payroll {
               
               // Log vacation hours if any
               if (vacationData.vacationHours > 0) {
-                // console.log(`Salaried employee vacation: ${vacationData.vacationHours} hours (included in worked hours for proration)`);
+                console.log(`Salaried employee vacation: ${vacationData.vacationHours} hours (included in worked hours for proration)`);
               }
               
               // For salaried employees, holiday pay is extra (added to salary)
@@ -312,12 +339,12 @@ class Payroll {
               
               // Log holiday hours if any
               if (holidayData.holidayHours > 0) {
-                // console.log(`Salaried employee holidays: ${holidayData.holidayHours} hours with pay $${holidayData.holidayPay}`);
-                // console.log(`New total with holiday pay: $${grossPay}`);
+                console.log(`Salaried employee holidays: ${holidayData.holidayHours} hours with pay $${holidayData.holidayPay}`);
+                console.log(`New total with holiday pay: $${grossPay}`);
               }
               
               payType = 'salary';
-              // console.log(`Calculated salary pay: Base ${salaryAmount}, Holiday Pay ${holidayData.holidayPay}, Total ${grossPay}`);
+              console.log(`Calculated salary pay: Base ${grossPay.toFixed(2)} (including proration/overtime), Holiday Pay ${holidayData.holidayPay}, Leave Pay ${leaveData.leaveAmount}`);
               break;
               
             case 'private_duty_nurse':
@@ -434,12 +461,13 @@ class Payroll {
               }
               
               // Calculate regular and overtime hours - include only worked hours, not vacation
-              let regularHours = Math.min(employeeInfo.totalHours, standardPeriodHours);
-              let overtimeHours = Math.max(0, employeeInfo.totalHours - standardPeriodHours);
+              regularHours = Math.min(employeeInfo.totalHours, standardPeriodHours);
+              overtimeHours = Math.max(0, employeeInfo.totalHours - standardPeriodHours);
               
               // Calculate regular pay for worked hours
               const regularPay = regularHours * hourlyRate;
               const overtimePay = overtimeHours * hourlyRate * 1.5; // Overtime at 1.5x
+              overtimeAmount = overtimePay;
               
               // Add vacation and holiday pay for hourly employees
               grossPay = regularPay + overtimePay + vacationData.vacationPay + leaveData.leaveAmount + holidayData.holidayPay;
@@ -466,18 +494,16 @@ class Payroll {
             employeeData
           );
           
-          // Set up variables for regular, overtime, vacation, and leave hours/pay
-          let regularHours = employeeInfo.totalHours;
-          let overtimeHours = 0;
-          let overtimeAmount = 0;
+          // Set up variables for vacation and leave hours/pay
+          // Note: regularHours, overtimeHours, and overtimeAmount are already set in the switch statement above
           let leaveHours = leaveData.leaveHours || 0;
           let leaveAmount = leaveData.leaveAmount || 0;
           let leaveType = leaveData.leaveType || null;
           let vacationHours = vacationData.vacationHours || 0;
           let vacationAmount = vacationData.vacationPay || 0;
           
-          // For hourly employees, use the calculated regular and overtime hours
-          if (employeeType === 'hourly') {
+          // For hourly employees, recalculate regular and overtime hours if not already set
+          if (employeeType === 'hourly' && regularHours === 0 && overtimeHours === 0) {
             // Define standard hours based on payment frequency
             let standardWeeklyHours = employeeData.standard_hours || 40; // Default to 40 hours per week
             let standardPeriodHours;
@@ -499,6 +525,12 @@ class Payroll {
             regularHours = Math.min(employeeInfo.totalHours, standardPeriodHours);
             overtimeHours = Math.max(0, employeeInfo.totalHours - standardPeriodHours);
             overtimeAmount = overtimeHours * hourlyRate * 1.5;
+          }
+          
+          // For salaried and private duty nurse employees, ensure regularHours is set if not already
+          if ((employeeType === 'salary' || employeeType === 'private_duty_nurse') && regularHours === 0 && overtimeHours === 0) {
+            // If not set in the switch statement, default regularHours to totalHours
+            regularHours = employeeInfo.totalHours;
           }
           
           // Insert the payroll item

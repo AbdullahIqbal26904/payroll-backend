@@ -221,7 +221,6 @@ const generatePaystubPDF = async (payrollItem, periodData, options = {}) => {
          .text(regularHours.toString(), leftTableX + colWidth, currentY + 5, { width: colWidth - 5, align: 'right' })
          .text(`$${regularEarnings}`, leftTableX + colWidth * 2, currentY + 5, { width: colWidth - 10, align: 'right' });
       
-      currentY += rowHeight;
       
       // Add overtime line if applicable - more compact
       if (parseFloat(overtimeHours) > 0 && parseFloat(overtimeAmount) > 0) {
