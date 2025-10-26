@@ -14,6 +14,11 @@ const parseDate = function(dateString) {
   if (!dateString) {
     throw new Error('Date string is empty');
   }
+
+  // Extract the first date-looking token (helps with trailing commas or text)
+  const trimmed = String(dateString).trim();
+  const dateMatch = trimmed.match(/\d{1,2}\/\d{1,2}\/\d{4}/);
+  const normalizedInput = dateMatch ? dateMatch[0] : trimmed;
   
   // Try to parse the date (handle different formats)
   let date;
@@ -21,17 +26,17 @@ const parseDate = function(dateString) {
   // Try M/D/YYYY format (both MM/DD/YYYY and M/D/YYYY)
   try {
     // First try MM/dd/yyyy format
-    date = parse(dateString.trim(), 'MM/dd/yyyy', new Date());
+    date = parse(normalizedInput, 'MM/dd/yyyy', new Date());
     if (isNaN(date.getTime())) {
       // If that fails, try M/d/yyyy format
-      date = parse(dateString.trim(), 'M/d/yyyy', new Date());
+      date = parse(normalizedInput, 'M/d/yyyy', new Date());
       if (isNaN(date.getTime())) throw new Error('Invalid date');
     }
     return date.toISOString().split('T')[0];
   } catch (e) {
     // Try other formats if needed
     try {
-      date = new Date(dateString.trim());
+      date = new Date(normalizedInput);
       if (isNaN(date.getTime())) throw new Error('Invalid date');
       return date.toISOString().split('T')[0];
     } catch (e2) {
@@ -96,16 +101,21 @@ exports.uploadTimesheet = async (req, res) => {
       }));
     }
     
-    // Extract report title and date range from first two lines
-    const reportTitle = lines[0].trim();
-    const dateRange = lines[1].trim();
+  // Extract report title and date range from first two lines (remove trailing columns)
+  const rawReportTitleLine = lines[0] || '';
+  const reportTitle = rawReportTitleLine.split(',')[0].trim();
+
+  const rawDateRangeLine = lines[1] || '';
+  const dateRange = rawDateRangeLine.split(',')[0].trim();
     
     console.log('Report Title:', reportTitle);
     console.log('Date Range:', dateRange);
     
     // Parse date range
-    let periodStart = null;
-    let periodEnd = null;
+  let periodStart = null;
+  let periodEnd = null;
+  let detectedStartDate = null;
+  let detectedEndDate = null;
     
     if (dateRange) {
       const dates = dateRange.split('-');
@@ -166,6 +176,11 @@ exports.uploadTimesheet = async (req, res) => {
         }
         console.log('values: ',values);
         
+        // Validate employee ID (EMP##) is not empty
+        if (!values[2] || values[2].trim() === '') {
+          throw new Error(`Missing or empty EMP## field for employee: ${values[0]} ${values[1]}`);
+        }
+        
         // Create timesheet entry with employee number as the primary identifier
         if (!values[3]) {
           throw new Error('Missing date field');
@@ -188,6 +203,16 @@ exports.uploadTimesheet = async (req, res) => {
         
         // Parse hours to decimal
         timeEntry.hoursDecimal = parseHoursToDecimal(timeEntry.totalHours);
+
+        // Track actual date range found in the data to guard against incorrect headers
+        if (timeEntry.date) {
+          if (!detectedStartDate || new Date(timeEntry.date) < new Date(detectedStartDate)) {
+            detectedStartDate = timeEntry.date;
+          }
+          if (!detectedEndDate || new Date(timeEntry.date) > new Date(detectedEndDate)) {
+            detectedEndDate = timeEntry.date;
+          }
+        }
         
         console.log('Processed entry:', 
           timeEntry.lastName, 
@@ -205,21 +230,32 @@ exports.uploadTimesheet = async (req, res) => {
       }
     }
     console.log('results: ',results)
+
+    // Determine the final period range to store
+    const headerRangeIsValid = periodStart && periodEnd && detectedStartDate && detectedEndDate &&
+      new Date(detectedStartDate) >= new Date(periodStart) && new Date(detectedEndDate) <= new Date(periodEnd);
+
+    const finalPeriodStart = headerRangeIsValid ? periodStart : (detectedStartDate || periodStart);
+    const finalPeriodEnd = headerRangeIsValid ? periodEnd : (detectedEndDate || periodEnd);
+
+    if (!headerRangeIsValid) {
+      console.log('Using detected date range for period:', finalPeriodStart, finalPeriodEnd);
+    }
     // Save to database if we have valid entries
     if (results.length > 0) {
       try {
         const periodId = await Timesheet.saveTimeEntries(results, {
           reportTitle,
-          periodStart,
-          periodEnd,
+          periodStart: finalPeriodStart,
+          periodEnd: finalPeriodEnd,
           userId: req.user.id
         });
         
         return res.status(200).json(formatSuccess('Timesheet data uploaded and processed successfully', {
           periodId,
           reportTitle,
-          periodStart,
-          periodEnd,
+          periodStart: finalPeriodStart,
+          periodEnd: finalPeriodEnd,
           totalEntries: results.length,
           errors: errors.length > 0 ? errors : null
         }));
@@ -250,13 +286,21 @@ exports.uploadTimesheet = async (req, res) => {
       }
     } else {
       return res.status(400).json(formatError({
-
         message: 'No valid timesheet entries found in the CSV file',
         errors
       }));
     }
   } catch (error) {
     console.error('CSV upload error:', error);
+    
+    // Check if the error is related to empty EMP## fields
+    if (error.message && error.message.includes('Missing or empty EMP## field')) {
+      return res.status(400).json(formatError({
+        message: 'Timesheet cannot be uploaded because of empty EMP## field(s)',
+        details: error.message
+      }));
+    }
+    
     return res.status(500).json(formatError(error));
   }
 };

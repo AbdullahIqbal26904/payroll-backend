@@ -13,12 +13,41 @@ class Timesheet {
    */
   static async saveTimeEntries(entries, periodInfo) {
     try {
+      // Derive actual date range from the entries to guard against malformed headers
+      const entryDates = entries
+        .map(entry => entry.date)
+        .filter(dateStr => !!dateStr)
+        .map(dateStr => new Date(dateStr));
+
+      let detectedStart = null;
+      let detectedEnd = null;
+
+      if (entryDates.length > 0) {
+        detectedStart = new Date(Math.min(...entryDates.map(date => date.getTime())));
+        detectedEnd = new Date(Math.max(...entryDates.map(date => date.getTime())));
+      }
+
+      const detectedStartISO = detectedStart ? detectedStart.toISOString().split('T')[0] : null;
+      const detectedEndISO = detectedEnd ? detectedEnd.toISOString().split('T')[0] : null;
+
+      const headerRangeIsValid = periodInfo.periodStart && periodInfo.periodEnd &&
+        detectedStartISO && detectedEndISO &&
+        new Date(detectedStartISO) >= new Date(periodInfo.periodStart) &&
+        new Date(detectedEndISO) <= new Date(periodInfo.periodEnd);
+
+      const finalPeriodStart = headerRangeIsValid ? periodInfo.periodStart : (detectedStartISO || periodInfo.periodStart);
+      const finalPeriodEnd = headerRangeIsValid ? periodInfo.periodEnd : (detectedEndISO || periodInfo.periodEnd);
+
+      if (!headerRangeIsValid && detectedStartISO && detectedEndISO) {
+        console.log('Overriding period range with detected dates:', finalPeriodStart, finalPeriodEnd);
+      }
+
       // Check if a period with the same start and end dates already exists
-      if (periodInfo.periodStart && periodInfo.periodEnd) {
+      if (finalPeriodStart && finalPeriodEnd) {
         const [existingPeriods] = await db.query(
           `SELECT id FROM timesheet_periods 
            WHERE period_start = ? AND period_end = ?`,
-          [periodInfo.periodStart, periodInfo.periodEnd]
+          [finalPeriodStart, finalPeriodEnd]
         );
         
         if (existingPeriods.length > 0) {
@@ -33,8 +62,8 @@ class Timesheet {
         ) VALUES (?, ?, ?, ?)`,
         [
           periodInfo.reportTitle,
-          periodInfo.periodStart,
-          periodInfo.periodEnd,
+          finalPeriodStart,
+          finalPeriodEnd,
           periodInfo.userId
         ]
       );

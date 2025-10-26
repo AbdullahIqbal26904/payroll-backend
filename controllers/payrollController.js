@@ -60,7 +60,9 @@ exports.uploadTimesheet = async (req, res) => {
     let dateRangeFound = false;
     let dateRange = '';
     let reportTitle = '';
-    let columnHeaders = [];
+  let columnHeaders = [];
+  let detectedStartDate = null;
+  let detectedEndDate = null;
     
     // First read the file as raw text to detect proper formatting
     const fileData = fs.readFileSync(filePath, 'utf8');
@@ -71,12 +73,14 @@ exports.uploadTimesheet = async (req, res) => {
       throw new Error('File has insufficient data');
     }
     
-    // First line should be the report title
-    reportTitle = lines[0].trim() || 'Punch Report';
+  // First line should be the report title (strip trailing columns)
+  const rawReportTitleLine = lines[0] || '';
+  reportTitle = rawReportTitleLine.split(',')[0].trim() || 'Punch Report';
     console.log(`Found report title: ${reportTitle}`);
     
     // Second line should be date range
-    dateRange = lines[1].trim() || '';
+  const rawDateRangeLine = lines[1] || '';
+  dateRange = rawDateRangeLine.split(',')[0].trim() || '';
     console.log(`Found date range: ${dateRange}`);
     
     // Determine the separator (tab or comma) by checking the third line
@@ -127,6 +131,16 @@ exports.uploadTimesheet = async (req, res) => {
         } else {
           timeEntry.hoursDecimal = 0;
         }
+
+        // Track detected date range from the actual data rows
+        if (timeEntry.date) {
+          if (!detectedStartDate || new Date(timeEntry.date) < new Date(detectedStartDate)) {
+            detectedStartDate = timeEntry.date;
+          }
+          if (!detectedEndDate || new Date(timeEntry.date) > new Date(detectedEndDate)) {
+            detectedEndDate = timeEntry.date;
+          }
+        }
         
         results.push(timeEntry);
       } catch (error) {
@@ -151,21 +165,32 @@ exports.uploadTimesheet = async (req, res) => {
       }
     }
     
+    // Determine final period range using detected dates when headers are missing or incorrect
+    const headerRangeIsValid = periodStart && periodEnd && detectedStartDate && detectedEndDate &&
+      new Date(detectedStartDate) >= new Date(periodStart) && new Date(detectedEndDate) <= new Date(periodEnd);
+
+    const finalPeriodStart = headerRangeIsValid ? periodStart : (detectedStartDate || periodStart);
+    const finalPeriodEnd = headerRangeIsValid ? periodEnd : (detectedEndDate || periodEnd);
+
+    if (!headerRangeIsValid) {
+      console.log('Using detected date range for period:', finalPeriodStart, finalPeriodEnd);
+    }
+
     // Save the timesheet data to database
     if (results.length > 0) {
       try {
         const periodId = await Timesheet.saveTimeEntries(results, {
           reportTitle,
-          periodStart,
-          periodEnd,
+          periodStart: finalPeriodStart,
+          periodEnd: finalPeriodEnd,
           userId: req.user.id
         });
         
         return res.status(200).json(formatSuccess('Timesheet data uploaded and processed successfully', {
           periodId,
           reportTitle,
-          periodStart,
-          periodEnd,
+          periodStart: finalPeriodStart,
+          periodEnd: finalPeriodEnd,
           totalEntries: results.length,
           errors: errors.length > 0 ? errors : null
         }));
@@ -215,19 +240,26 @@ exports.parseDate = function(dateString) {
   if (!dateString) {
     throw new Error('Date string is empty');
   }
+
+  const trimmed = String(dateString).trim();
+  const dateMatch = trimmed.match(/\d{1,2}\/\d{1,2}\/\d{4}/);
+  const normalizedInput = dateMatch ? dateMatch[0] : trimmed;
   
   // Try to parse the date (handle different formats)
   let date;
   
   // Try M/D/YYYY format
   try {
-    date = parse(dateString, 'MM/dd/yyyy', new Date());
-    if (isNaN(date.getTime())) throw new Error('Invalid date');
+    date = parse(normalizedInput, 'MM/dd/yyyy', new Date());
+    if (isNaN(date.getTime())) {
+      date = parse(normalizedInput, 'M/d/yyyy', new Date());
+      if (isNaN(date.getTime())) throw new Error('Invalid date');
+    }
     return date.toISOString().split('T')[0];
   } catch (e) {
     // Try other formats if needed
     try {
-      date = new Date(dateString);
+      date = new Date(normalizedInput);
       if (isNaN(date.getTime())) throw new Error('Invalid date');
       return date.toISOString().split('T')[0];
     } catch (e2) {
