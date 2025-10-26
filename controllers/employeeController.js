@@ -366,6 +366,8 @@ exports.updateEmployee = async (req, res) => {
     city,
     country
   } = req.body;
+  // Allow changing the employee's ID via request body: `employee_id` (new value)
+  const newEmployeeId = req.body.employee_id || null;
   
   try {
     // Start transaction for data consistency
@@ -383,6 +385,111 @@ exports.updateEmployee = async (req, res) => {
         success: false,
         message: 'Employee not found'
       });
+    }
+    // We'll use this variable as the effective employee id for subsequent queries
+    let employeeIdToUse = req.params.id;
+
+    // Handle changing employee id if requested
+    if (newEmployeeId && newEmployeeId !== req.params.id) {
+      // Check if the new ID is already taken
+      const [existingWithNewId] = await db.query(
+        'SELECT * FROM employees WHERE id = ?',
+        [newEmployeeId]
+      );
+
+      if (existingWithNewId.length > 0) {
+        await db.query('ROLLBACK');
+        return res.status(400).json({
+          success: false,
+          message: 'An employee with the new ID already exists'
+        });
+      }
+
+      // Strategy: MySQL enforces immediate foreign key checks. Updating child rows to
+      // reference a non-existent parent will fail. To safely change the employee PK
+      // without ON UPDATE CASCADE, we:
+      // 1. Insert a new employee row with the new ID copying current employee data
+      // 2. Update child tables to point to the new ID
+      // 3. Delete the old employee row
+      // This keeps referential integrity intact.
+
+      // Insert new employee row copying values from the existing employee
+      const src = employee[0];
+      try {
+        await db.query(
+          `INSERT INTO employees 
+            (id, user_id, first_name, last_name, date_of_birth, gender, address, phone, email,
+             hire_date, job_title, employee_type, department_id, salary_amount, hourly_rate, standard_hours, payment_frequency,
+             is_exempt_ss, is_exempt_medical, date_of_birth_for_age, status, social_security_no, medical_benefits_no, city, country)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            newEmployeeId,
+            src.user_id,
+            src.first_name,
+            src.last_name,
+            src.date_of_birth,
+            src.gender,
+            src.address,
+            src.phone,
+            src.email,
+            src.hire_date,
+            src.job_title,
+            src.employee_type,
+            src.department_id,
+            src.salary_amount,
+            src.hourly_rate,
+            src.standard_hours,
+            src.payment_frequency,
+            src.is_exempt_ss,
+            src.is_exempt_medical,
+            src.date_of_birth_for_age,
+            src.status,
+            src.social_security_no,
+            src.medical_benefits_no,
+            src.city,
+            src.country
+          ]
+        );
+      } catch (err) {
+        await db.query('ROLLBACK');
+        return res.status(500).json({ success: false, message: 'Failed creating employee with new ID', error: err.message });
+      }
+
+      // List of known tables that reference employee_id and should be updated
+      const tablesToUpdate = [
+        'timesheet_entries',
+        'payroll_items',
+        'employee_ytd_summary',
+        'employee_loans',
+        'employee_vacations',
+        'employee_banking_info',
+        'employee_leaves'
+      ];
+
+      // Update all referencing tables to point to the new employee id
+      for (const table of tablesToUpdate) {
+        try {
+          await db.query(
+            `UPDATE ${table} SET employee_id = ? WHERE employee_id = ?`,
+            [newEmployeeId, req.params.id]
+          );
+        } catch (err) {
+          // If a table does not exist or update fails, rollback and return error
+          await db.query('ROLLBACK');
+          return res.status(500).json({ success: false, message: `Failed updating references in ${table}`, error: err.message });
+        }
+      }
+
+      // Delete the old employee row
+      try {
+        await db.query('DELETE FROM employees WHERE id = ?', [req.params.id]);
+      } catch (err) {
+        await db.query('ROLLBACK');
+        return res.status(500).json({ success: false, message: 'Failed deleting old employee record', error: err.message });
+      }
+
+      // Use the new id for subsequent queries
+      employeeIdToUse = newEmployeeId;
     }
     
     // Calculate age for date_of_birth_for_age if date_of_birth is provided
@@ -435,7 +542,7 @@ exports.updateEmployee = async (req, res) => {
         // Update employee with new user_id
         await db.query(
           'UPDATE employees SET user_id = ? WHERE id = ?',
-          [userResult.insertId, req.params.id]
+          [userResult.insertId, employeeIdToUse]
         );
       }
     }
@@ -475,7 +582,7 @@ exports.updateEmployee = async (req, res) => {
         medical_benefits_no !== undefined ? medical_benefits_no : employee[0].medical_benefits_no,
         city !== undefined ? city : employee[0].city,
         country !== undefined ? country : employee[0].country,
-        req.params.id
+        employeeIdToUse
       ]
     );
     
@@ -485,7 +592,7 @@ exports.updateEmployee = async (req, res) => {
     // Get updated employee
     const [updatedEmployee] = await db.query(
       'SELECT * FROM employees WHERE id = ?',
-      [req.params.id]
+      [employeeIdToUse]
     );
     
     // Get associated user if exists
