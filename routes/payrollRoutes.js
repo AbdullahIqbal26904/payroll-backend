@@ -15,7 +15,7 @@ const {
   upload
 } = require('../controllers/payrollController');
 const { applyPayrollOverride } = require('../controllers/overrideController');
-const { uploadTimesheet } = require('../controllers/timesheetController');
+const { uploadTimesheet, deleteTimesheetPeriod } = require('../controllers/timesheetController');
 const { protect, authorize } = require('../middlewares/auth');
 
 const router = express.Router();
@@ -29,6 +29,7 @@ router.use(authorize('admin'));
 router.post('/upload-timesheet', upload.single('file'), uploadTimesheet);
 router.get('/timesheet-periods', getTimesheetPeriods);
 router.get('/timesheet-periods/:id', getTimesheetPeriod);
+router.delete('/timesheet-periods/:id', deleteTimesheetPeriod);
 
 // Payroll calculation routes
 router.post('/calculate', calculatePayroll);

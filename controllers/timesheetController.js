@@ -260,3 +260,50 @@ exports.uploadTimesheet = async (req, res) => {
     return res.status(500).json(formatError(error));
   }
 };
+
+/**
+ * @desc    Delete a timesheet period and all associated entries
+ * @route   DELETE /api/payroll/timesheet-periods/:id
+ * @access  Private/Admin
+ */
+exports.deleteTimesheetPeriod = async (req, res) => {
+  try {
+    const periodId = parseInt(req.params.id, 10);
+
+    if (isNaN(periodId)) {
+      return res.status(400).json(formatError({
+        message: 'Invalid period ID'
+      }));
+    }
+
+    // Delete the period using the Timesheet model
+    const result = await Timesheet.deletePeriod(periodId);
+
+    return res.status(200).json(formatSuccess(
+      'Timesheet period deleted successfully',
+      {
+        periodId: result.deletedPeriod.id,
+        periodStart: result.deletedPeriod.periodStart,
+        periodEnd: result.deletedPeriod.periodEnd,
+        reportTitle: result.deletedPeriod.reportTitle,
+        deletedEntriesCount: result.deletedEntriesCount,
+        deletedPayrollRunsCount: result.deletedPayrollRunsCount,
+        message: `Deleted period with ${result.deletedEntriesCount} timesheet entries and ${result.deletedPayrollRunsCount} payroll runs`
+      }
+    ));
+  } catch (error) {
+    console.error('Error deleting timesheet period:', error);
+
+    if (error.message === 'Timesheet period not found') {
+      return res.status(404).json(formatError({
+        message: 'Timesheet period not found',
+        details: `No timesheet period found with ID ${req.params.id}`
+      }));
+    }
+
+    return res.status(500).json(formatError({
+      message: 'Error deleting timesheet period',
+      details: error.message
+    }));
+  }
+};

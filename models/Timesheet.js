@@ -234,6 +234,57 @@ class Timesheet {
       throw error;
     }
   }
+
+  /**
+   * Delete timesheet period by ID
+   * @param {number} periodId - Period ID
+   * @returns {Promise<Object>} Delete result with information about deleted records
+   */
+  static async deletePeriod(periodId) {
+    try {
+      // First, check if the period exists
+      const period = await this.getPeriodById(periodId);
+      if (!period) {
+        throw new Error('Timesheet period not found');
+      }
+
+      // Get count of associated entries and payroll runs before deletion
+      const [entriesCount] = await db.query(
+        `SELECT COUNT(*) as count FROM timesheet_entries WHERE period_id = ?`,
+        [periodId]
+      );
+
+      const [payrollRunsCount] = await db.query(
+        `SELECT COUNT(*) as count FROM payroll_runs WHERE period_id = ?`,
+        [periodId]
+      );
+
+      // Delete the period (CASCADE will automatically delete entries and payroll runs)
+      const [result] = await db.query(
+        `DELETE FROM timesheet_periods WHERE id = ?`,
+        [periodId]
+      );
+
+      if (result.affectedRows === 0) {
+        throw new Error('Failed to delete timesheet period');
+      }
+
+      return {
+        success: true,
+        deletedPeriod: {
+          id: periodId,
+          periodStart: period.period_start,
+          periodEnd: period.period_end,
+          reportTitle: period.report_title
+        },
+        deletedEntriesCount: entriesCount[0].count,
+        deletedPayrollRunsCount: payrollRunsCount[0].count
+      };
+    } catch (error) {
+      console.error('Error deleting timesheet period:', error);
+      throw error;
+    }
+  }
 }
 
 module.exports = Timesheet;
