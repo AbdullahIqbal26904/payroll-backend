@@ -86,6 +86,7 @@ class Payroll {
         // console.log(`Found ${timesheetEntries.length} timesheet entries between ${startDate} and ${endDate}`);
         
         // Group entries by employee ID (primary) or name (fallback)
+        // Lunch entries (is_lunch = true) are tracked separately and deducted from total work hours
         const employeeHours = {};
         
         timesheetEntries.forEach(entry => {
@@ -99,14 +100,36 @@ class Payroll {
               employeeId: entry.employee_id,
               employeeDbId: entry.employee_db_id,
               totalHours: 0,
+              lunchHours: 0,      // Track lunch hours separately
+              workHours: 0,       // Net work hours (total - lunch)
               entries: []
             };
           }
           
           // Parse the time string to get actual hours
           const totalHours = this.parseTimeToHours(entry.total_hours);
-          employeeHours[key].totalHours += totalHours;
+          
+          // Check if this is a lunch entry (is_lunch flag or lunch_hours > 0)
+          const isLunchEntry = entry.is_lunch === 1 || entry.is_lunch === true || (entry.lunch_hours && parseFloat(entry.lunch_hours) > 0);
+          
+          if (isLunchEntry) {
+            // This is a lunch entry - track separately
+            const lunchHrs = entry.lunch_hours ? parseFloat(entry.lunch_hours) : totalHours;
+            employeeHours[key].lunchHours += lunchHrs;
+            // console.log(`Lunch entry for ${entry.first_name} ${entry.last_name}: ${lunchHrs} hours on ${entry.work_date}`);
+          } else {
+            // This is a work entry - add to total work hours
+            employeeHours[key].totalHours += totalHours;
+          }
+          
           employeeHours[key].entries.push(entry);
+        });
+        
+        // Calculate net work hours (total hours minus lunch hours) for each employee
+        Object.keys(employeeHours).forEach(key => {
+          const emp = employeeHours[key];
+          emp.workHours = emp.totalHours; // Work hours are already calculated without lunch
+          // console.log(`Employee ${emp.firstName} ${emp.lastName}: Total Work: ${emp.workHours} hrs, Lunch: ${emp.lunchHours} hrs`);
         });
         
         // Get settings for calculations
@@ -280,7 +303,8 @@ class Payroll {
               const leaveHoursForPeriod = leaveData.leaveHours || 0;
               
               // Calculate actual worked hours (timesheet hours only, without vacation/leave)
-              const actualWorkedHours = employeeInfo.totalHours;
+              // Use workHours which already excludes lunch time
+              const actualWorkedHours = employeeInfo.workHours;
               
               // Calculate regular and overtime hours for salaried employees
               // Regular hours: up to the standard hours for the period
@@ -352,8 +376,14 @@ class Payroll {
               let totalNursePay = 0;
               const dailyEntries = {};
               
-              // Group entries by date
+              // Group entries by date (excluding lunch entries)
               employeeInfo.entries.forEach(entry => {
+                // Skip lunch entries - they should not be paid
+                const isLunchEntry = entry.is_lunch === 1 || entry.is_lunch === true || (entry.lunch_hours && parseFloat(entry.lunch_hours) > 0);
+                if (isLunchEntry) {
+                  return; // Skip lunch entries
+                }
+                
                 // timesheet_entries uses 'work_date' column
                 const dateValue = entry.work_date || entry.date;
                 const entryDate = new Date(dateValue).toDateString();
@@ -460,9 +490,9 @@ class Payroll {
                 standardPeriodHours = standardWeeklyHours * 4.33;
               }
               
-              // Calculate regular and overtime hours - include only worked hours, not vacation
-              regularHours = Math.min(employeeInfo.totalHours, standardPeriodHours);
-              overtimeHours = Math.max(0, employeeInfo.totalHours - standardPeriodHours);
+              // Calculate regular and overtime hours - include only worked hours (excluding lunch), not vacation
+              regularHours = Math.min(employeeInfo.workHours, standardPeriodHours);
+              overtimeHours = Math.max(0, employeeInfo.workHours - standardPeriodHours);
               
               // Calculate regular pay for worked hours
               const regularPay = regularHours * hourlyRate;
@@ -522,34 +552,42 @@ class Payroll {
             const hourlyRate = employeeData.hourly_rate !== undefined ? employeeData.hourly_rate : 
                              (employeeData.rate !== undefined ? employeeData.rate : 0);
             
-            regularHours = Math.min(employeeInfo.totalHours, standardPeriodHours);
-            overtimeHours = Math.max(0, employeeInfo.totalHours - standardPeriodHours);
+            regularHours = Math.min(employeeInfo.workHours, standardPeriodHours);
+            overtimeHours = Math.max(0, employeeInfo.workHours - standardPeriodHours);
             overtimeAmount = overtimeHours * hourlyRate * 1.5;
           }
           
           // For salaried and private duty nurse employees, ensure regularHours is set if not already
           if ((employeeType === 'salary' || employeeType === 'private_duty_nurse') && regularHours === 0 && overtimeHours === 0) {
-            // If not set in the switch statement, default regularHours to totalHours
-            regularHours = employeeInfo.totalHours;
+            // If not set in the switch statement, default regularHours to workHours (excluding lunch)
+            regularHours = employeeInfo.workHours;
           }
           
+          // Calculate total hours (work hours + lunch hours) for reporting purposes
+          const totalHoursWithLunch = employeeInfo.workHours + employeeInfo.lunchHours;
+          
           // Insert the payroll item
+          // hours_worked uses workHours which excludes lunch time
+          // lunch_hours tracks the lunch time that was deducted
+          // total_hours shows the total before lunch deduction
           const [itemResult] = await connection.query(
             `INSERT INTO payroll_items (
               payroll_run_id, employee_id, employee_name, employee_type,
-              hours_worked, regular_hours, overtime_hours, overtime_amount, 
+              hours_worked, lunch_hours, total_hours, regular_hours, overtime_hours, overtime_amount, 
               vacation_hours, vacation_amount, leave_hours, leave_amount, leave_type,
               holiday_hours, holiday_amount, gross_pay,
               social_security_employee, social_security_employer,
               medical_benefits_employee, medical_benefits_employer,
               education_levy, net_pay
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [
               payrollRunId,
               employeeDbId,
               `${employeeData.first_name} ${employeeData.last_name}`,
               employeeType,
-              employeeInfo.totalHours,
+              employeeInfo.workHours,      // Paid hours (excludes lunch)
+              employeeInfo.lunchHours,     // Lunch hours (deducted/unpaid)
+              totalHoursWithLunch,         // Total hours before lunch deduction
               regularHours,
               overtimeHours,
               overtimeAmount,
@@ -634,6 +672,7 @@ class Payroll {
             const ytdData = await this.calculateYTDTotals(employeeDbId, payDate);
             
             // Add current payroll values to YTD totals
+            // Use workHours for YTD calculation (excludes lunch time)
             const updatedYtdData = {
               ytd_gross_pay: ytdData.ytd_gross_pay + grossPay,
               ytd_social_security_employee: ytdData.ytd_social_security_employee + deductions.socialSecurityEmployee,
@@ -642,7 +681,7 @@ class Payroll {
               ytd_medical_benefits_employer: ytdData.ytd_medical_benefits_employer + deductions.medicalBenefitsEmployer,
               ytd_education_levy: ytdData.ytd_education_levy + deductions.educationLevy,
               ytd_net_pay: ytdData.ytd_net_pay + finalNetPay,
-              ytd_hours_worked: ytdData.ytd_hours_worked + employeeInfo.totalHours,
+              ytd_hours_worked: ytdData.ytd_hours_worked + employeeInfo.workHours,  // Use workHours (excludes lunch)
               ytd_vacation_hours: (ytdData.ytd_vacation_hours || 0) + vacationHours,
               ytd_vacation_amount: (ytdData.ytd_vacation_amount || 0) + vacationAmount,
               ytd_holiday_hours: (ytdData.ytd_holiday_hours || 0) + (holidayData.holidayHours || 0),
@@ -694,11 +733,14 @@ class Payroll {
             });
           }
           
-          // Add to payroll items list
+          // Add to payroll items list with lunch hours details
           payrollItems.push({
             payrollItemId,
             employeeId: employeeDbId,
             employeeName: `${employeeData.first_name} ${employeeData.last_name}`,
+            hoursWorked: employeeInfo.workHours,         // Paid hours (excludes lunch)
+            lunchHours: employeeInfo.lunchHours,         // Lunch hours (deducted)
+            totalHours: employeeInfo.workHours + employeeInfo.lunchHours,  // Total before deduction
             grossPay,
             netPay: finalNetPay,
             totalDeductions: deductions.totalDeductions + totalLoanDeduction,

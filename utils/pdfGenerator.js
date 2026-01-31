@@ -179,6 +179,10 @@ const generatePaystubPDF = async (payrollItem, periodData, options = {}) => {
       const overtimeHours = payrollItem.overtimeHours || payrollItem.overtime_hours || 0;
       const overtimeAmount = parseFloat(payrollItem.overtimeAmount || payrollItem.overtime_amount || 0).toFixed(2);
       
+      // Get lunch hours data
+      const lunchHours = payrollItem.lunchHours || payrollItem.lunch_hours || 0;
+      const totalHoursWithLunch = payrollItem.totalHours || payrollItem.total_hours || (parseFloat(hoursWorked) + parseFloat(lunchHours));
+      
       // Get vacation hours and pay
       const vacationHours = payrollItem.vacationHours || payrollItem.vacation_hours || 0;
       const vacationAmount = parseFloat(payrollItem.vacationAmount || payrollItem.vacation_amount || 0).toFixed(2);
@@ -254,6 +258,17 @@ const generatePaystubPDF = async (payrollItem, periodData, options = {}) => {
            .text('Holiday Pay', leftTableX + 5, currentY + 5, { width: colWidth - 5, align: 'left' })
            .text(holidayHours.toString(), leftTableX + colWidth, currentY + 5, { width: colWidth - 5, align: 'right' })
            .text(`$${holidayAmount}`, leftTableX + colWidth * 2, currentY + 5, { width: colWidth - 10, align: 'right' });
+      }
+      
+      // Add lunch hours row if applicable (unpaid time)
+      if (parseFloat(lunchHours) > 0) {
+        currentY += rowHeight;
+        doc.rect(leftTableX, currentY, halfTableWidth, rowHeight)
+           .fillAndStroke('#fff3cd', colors.border); // Yellow-ish background for unpaid
+        doc.fillColor(colors.text).fontSize(8).font('Helvetica')
+           .text('Lunch (Unpaid)', leftTableX + 5, currentY + 5, { width: colWidth - 5, align: 'left' })
+           .text(parseFloat(lunchHours).toFixed(2), leftTableX + colWidth, currentY + 5, { width: colWidth - 5, align: 'right' })
+           .text('$0.00', leftTableX + colWidth * 2, currentY + 5, { width: colWidth - 10, align: 'right' });
       }
       
       // We will handle the Gross Pay later to align with Net Pay
@@ -387,8 +402,45 @@ const generatePaystubPDF = async (payrollItem, periodData, options = {}) => {
       // Now, the bottom of the two tables is the maximum of the bottom of the earnings table (currentY) and the deductionsBottom
       const tablesBottom = Math.max(currentY, deductionsBottom);
       
+      // Add Time Summary section if lunch hours exist
+      let timeSummaryHeight = 0;
+      if (parseFloat(lunchHours) > 0) {
+        const timeSummaryY = tablesBottom + 10;
+        timeSummaryHeight = 58; // Header (20) + 2 rows (18 each) + gap
+        
+        // Section header with colored background
+        doc.rect(leftTableX, timeSummaryY, tableWidth, 20)
+           .fillAndStroke(colors.secondary, colors.secondary);
+           
+        doc.fillColor('white')
+           .fontSize(12).font('Helvetica-Bold')
+           .text('Time Summary', leftTableX + 10, timeSummaryY + 5);
+        
+        // Time summary content - 3 columns
+        const timeColWidth = tableWidth / 3;
+        
+        // Header row
+        doc.rect(leftTableX, timeSummaryY + 20, tableWidth, 18)
+           .fillAndStroke('#e9ecef', colors.border);
+           
+        doc.fillColor(colors.text)
+           .fontSize(9).font('Helvetica-Bold')
+           .text('Total Hours', leftTableX + 5, timeSummaryY + 25, { width: timeColWidth - 5, align: 'center' })
+           .text('Work Hours (Paid)', leftTableX + timeColWidth, timeSummaryY + 25, { width: timeColWidth - 5, align: 'center' })
+           .text('Lunch Hours (Unpaid)', leftTableX + timeColWidth * 2, timeSummaryY + 25, { width: timeColWidth - 5, align: 'center' });
+        
+        // Data row
+        doc.rect(leftTableX, timeSummaryY + 38, tableWidth, 18)
+           .fillAndStroke('white', colors.border);
+           
+        doc.fillColor(colors.text).fontSize(9).font('Helvetica')
+           .text(parseFloat(totalHoursWithLunch).toFixed(2), leftTableX + 5, timeSummaryY + 43, { width: timeColWidth - 5, align: 'center' })
+           .text(parseFloat(hoursWorked).toFixed(2), leftTableX + timeColWidth, timeSummaryY + 43, { width: timeColWidth - 5, align: 'center' })
+           .text(parseFloat(lunchHours).toFixed(2), leftTableX + timeColWidth * 2, timeSummaryY + 43, { width: timeColWidth - 5, align: 'center' });
+      }
+      
       // Set the starting Y for the YTD summary section with a smaller gap
-      const ytdY = tablesBottom + 10; // Reduced spacing
+      const ytdY = tablesBottom + 10 + timeSummaryHeight; // Reduced spacing
       
       /* Commented out Employer Contributions section as per client request
       // Add employer contributions section on first page - more compact

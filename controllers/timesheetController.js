@@ -186,6 +186,11 @@ exports.uploadTimesheet = async (req, res) => {
           throw new Error('Missing date field');
         }
         
+        // Check for lunch flag in column 7 (new CSV format)
+        // Lunch flag can be 'L', 'l', or empty
+        const lunchFlag = (values[7] || '').trim().toUpperCase();
+        const isLunch = lunchFlag === 'L';
+        
         const timeEntry = {
           lastName: values[0],
           firstName: values[1],
@@ -194,15 +199,19 @@ exports.uploadTimesheet = async (req, res) => {
           timeIn: values[4] || null,
           timeOut: values[5] || null,
           totalHours: values[6] || '0:00',
-          deptCode: values[7] || null,
-          inLocation: values[8] || null,
-          inPunchMethod: values[9] || null,
-          outLocation: values[10] || null,
-          outPunchMethod: values[11] || null
+          isLunch: isLunch,             // New: lunch flag from column 7
+          deptCode: values[8] || null,  // Shifted: was index 7, now index 8
+          inLocation: values[9] || null,  // Shifted: was index 8, now index 9
+          inPunchMethod: values[10] || null, // Shifted: was index 9, now index 10
+          outLocation: values[11] || null,   // Shifted: was index 10, now index 11
+          outPunchMethod: values[12] || null // Shifted: was index 11, now index 12
         };
         
         // Parse hours to decimal
         timeEntry.hoursDecimal = parseHoursToDecimal(timeEntry.totalHours);
+        
+        // Store lunch hours separately if this is a lunch entry
+        timeEntry.lunchHours = isLunch ? timeEntry.hoursDecimal : 0;
 
         // Track actual date range found in the data to guard against incorrect headers
         if (timeEntry.date) {

@@ -50,44 +50,44 @@ exports.uploadTimesheet = async (req, res) => {
         message: 'Please upload a CSV file'
       });
     }
-    
+
     const filePath = req.file.path;
     const results = [];
     let errors = [];
-    
+
     // Processing state
     let headerFound = false;
     let dateRangeFound = false;
     let dateRange = '';
     let reportTitle = '';
-  let columnHeaders = [];
-  let detectedStartDate = null;
-  let detectedEndDate = null;
-    
+    let columnHeaders = [];
+    let detectedStartDate = null;
+    let detectedEndDate = null;
+
     // First read the file as raw text to detect proper formatting
     const fileData = fs.readFileSync(filePath, 'utf8');
     const lines = fileData.split('\n');
-    
+
     // Check if there's at least 3 lines (header, date range, column headers)
     if (lines.length < 3) {
       throw new Error('File has insufficient data');
     }
-    
-  // First line should be the report title (strip trailing columns)
-  const rawReportTitleLine = lines[0] || '';
-  reportTitle = rawReportTitleLine.split(',')[0].trim() || 'Punch Report';
+
+    // First line should be the report title (strip trailing columns)
+    const rawReportTitleLine = lines[0] || '';
+    reportTitle = rawReportTitleLine.split(',')[0].trim() || 'Punch Report';
     console.log(`Found report title: ${reportTitle}`);
-    
+
     // Second line should be date range
-  const rawDateRangeLine = lines[1] || '';
-  dateRange = rawDateRangeLine.split(',')[0].trim() || '';
+    const rawDateRangeLine = lines[1] || '';
+    dateRange = rawDateRangeLine.split(',')[0].trim() || '';
     console.log(`Found date range: ${dateRange}`);
-    
+
     // Determine the separator (tab or comma) by checking the third line
     const hasTabs = lines[2].includes('\t');
     const separator = hasTabs ? '\t' : ',';
     console.log(`Using separator: ${separator === '\t' ? 'tab' : 'comma'}`);
-    
+
     // Extract report title and date range from the first two lines
     const csvStream = fs.createReadStream(filePath)
       .pipe(csv({
@@ -95,20 +95,20 @@ exports.uploadTimesheet = async (req, res) => {
         headers: true, // Use the third line as headers
         separator: separator
       }));
-    
+
     // Parse the CSV file
     for await (const row of csvStream) {
       console.log('Processing row:', JSON.stringify(row));
-      
+
       // Process actual timesheet data
       try {
         const rowValues = Object.values(row);
-        
+
         // Check if we have actual data (not empty lines)
         if (rowValues.length < 5 || !rowValues[0] || !rowValues[3]) {
           continue; // Skip empty or incomplete rows
         }
-        
+
         // Parse the time entry
         const timeEntry = {
           lastName: rowValues[0],
@@ -124,7 +124,7 @@ exports.uploadTimesheet = async (req, res) => {
           outLocation: rowValues[10] || null,
           outPunchMethod: rowValues[11] || null
         };
-        
+
         // Parse hours from format like "11:51" or ":30" to decimal hours
         if (timeEntry.totalHours) {
           timeEntry.hoursDecimal = this.parseHoursToDecimal(timeEntry.totalHours);
@@ -141,18 +141,18 @@ exports.uploadTimesheet = async (req, res) => {
             detectedEndDate = timeEntry.date;
           }
         }
-        
+
         results.push(timeEntry);
       } catch (error) {
         console.error('Error processing row:', error);
         errors.push({ row: Object.values(row), error: error.message });
       }
     }
-    
+
     // Extract date range from the format "MM/DD/YYYY-MM/DD/YYYY"
     let periodStart = null;
     let periodEnd = null;
-    
+
     if (dateRange) {
       const dates = dateRange.split('-');
       if (dates.length === 2) {
@@ -164,7 +164,7 @@ exports.uploadTimesheet = async (req, res) => {
         }
       }
     }
-    
+
     // Determine final period range using detected dates when headers are missing or incorrect
     const headerRangeIsValid = periodStart && periodEnd && detectedStartDate && detectedEndDate &&
       new Date(detectedStartDate) >= new Date(periodStart) && new Date(detectedEndDate) <= new Date(periodEnd);
@@ -185,7 +185,7 @@ exports.uploadTimesheet = async (req, res) => {
           periodEnd: finalPeriodEnd,
           userId: req.user.id
         });
-        
+
         return res.status(200).json(formatSuccess('Timesheet data uploaded and processed successfully', {
           periodId,
           reportTitle,
@@ -196,16 +196,16 @@ exports.uploadTimesheet = async (req, res) => {
         }));
       } catch (dbError) {
         console.error('Database error:', dbError);
-        
+
         // Check if this is a duplicate period error
-        if (dbError.message && dbError.message.includes('duplicate') || 
-            dbError.message && dbError.message.includes('already been uploaded')) {
+        if (dbError.message && dbError.message.includes('duplicate') ||
+          dbError.message && dbError.message.includes('already been uploaded')) {
           return res.status(409).json(formatError({
             message: 'This pay period already exists in the system. Each period can only be uploaded once.',
             details: dbError.message
           }));
         }
-        
+
         // Handle unique constraint violation from MySQL
         if (dbError.code === 'ER_DUP_ENTRY') {
           return res.status(409).json(formatError({
@@ -213,7 +213,7 @@ exports.uploadTimesheet = async (req, res) => {
             details: 'Duplicate period detected'
           }));
         }
-        
+
         return res.status(500).json(formatError({
           message: 'Error saving timesheet data to the database',
           details: dbError.message
@@ -236,7 +236,7 @@ exports.uploadTimesheet = async (req, res) => {
  * @param {string} dateString - Date string to parse
  * @returns {string} - ISO date string
  */
-exports.parseDate = function(dateString) {
+exports.parseDate = function (dateString) {
   if (!dateString) {
     throw new Error('Date string is empty');
   }
@@ -244,10 +244,10 @@ exports.parseDate = function(dateString) {
   const trimmed = String(dateString).trim();
   const dateMatch = trimmed.match(/\d{1,2}\/\d{1,2}\/\d{4}/);
   const normalizedInput = dateMatch ? dateMatch[0] : trimmed;
-  
+
   // Try to parse the date (handle different formats)
   let date;
-  
+
   // Try M/D/YYYY format
   try {
     date = parse(normalizedInput, 'MM/dd/yyyy', new Date());
@@ -273,26 +273,26 @@ exports.parseDate = function(dateString) {
  * @param {string} hoursString - Hours string to parse (HH:MM format or :MM format)
  * @returns {number} - Hours in decimal
  */
-exports.parseHoursToDecimal = function(hoursString) {
+exports.parseHoursToDecimal = function (hoursString) {
   if (!hoursString || hoursString === '0:00') {
     return 0;
   }
-  
+
   // Handle the case where the hours string starts with a colon (like ":30")
   if (hoursString.startsWith(':')) {
     const minutes = parseInt(hoursString.substring(1), 10);
     return minutes / 60;
   }
-  
+
   // Handle the normal case (like "11:51")
   const parts = hoursString.split(':');
   if (parts.length !== 2) {
     return 0;
   }
-  
+
   const hours = parseInt(parts[0], 10);
   const minutes = parseInt(parts[1], 10);
-  
+
   // Convert to decimal hours
   return hours + (minutes / 60);
 };
@@ -306,9 +306,9 @@ exports.getTimesheetPeriods = async (req, res) => {
   try {
     const { limit = 10, page = 1 } = req.query;
     const offset = (page - 1) * limit;
-    
+
     const periods = await Timesheet.getAllPeriods({ limit, offset });
-    
+
     return res.status(200).json(formatSuccess('Timesheet periods retrieved successfully', periods));
   } catch (error) {
     console.error('Error retrieving timesheet periods:', error);
@@ -324,20 +324,24 @@ exports.getTimesheetPeriods = async (req, res) => {
 exports.getTimesheetPeriod = async (req, res) => {
   try {
     const { id } = req.params;
-    
+
     const period = await Timesheet.getPeriodById(id);
-    
+
     if (!period) {
       return res.status(404).json(formatError({
         message: 'Timesheet period not found'
       }));
     }
-    
+
     const entries = await Timesheet.getEntriesByPeriodId(id);
     
+    // Get lunch hours summary for reporting
+    const lunchSummary = await Timesheet.getLunchSummaryByPeriodId(id);
+
     return res.status(200).json(formatSuccess('Timesheet period retrieved successfully', {
       period,
-      entries
+      entries,
+      lunchSummary  // Include lunch hours summary in the response
     }));
   } catch (error) {
     console.error('Error retrieving timesheet period:', error);
@@ -353,34 +357,34 @@ exports.getTimesheetPeriod = async (req, res) => {
 exports.calculatePayroll = async (req, res) => {
   try {
     const { periodId, payDate, periodStart, periodEnd } = req.body;
-    
+
     if (!periodId) {
       return res.status(400).json(formatError({
         message: 'Period ID is required'
       }));
     }
-    
+
     // Build options object with optional custom period dates
     const options = {
       payDate: payDate ? new Date(payDate) : new Date()
     };
-    
+
     // Add custom period dates if provided
     if (periodStart) {
       options.periodStart = new Date(periodStart);
     }
-    
+
     if (periodEnd) {
       options.periodEnd = new Date(periodEnd);
     }
-    
+
     // Call the Payroll model to perform calculations
     const result = await Payroll.calculateForPeriod(
       periodId,
       options,
       req.user.id
     );
-    
+
     return res.status(200).json(formatSuccess('Payroll calculated successfully', result));
   } catch (error) {
     console.error('Error calculating payroll:', error);
@@ -445,9 +449,9 @@ exports.getPayrollReports = async (req, res) => {
   try {
     const { limit = 10, page = 1 } = req.query;
     const offset = (page - 1) * limit;
-    
+
     const reports = await Payroll.getAllPayrollRuns({ limit, offset });
-    
+
     return res.status(200).json(formatSuccess('Payroll reports retrieved successfully', reports));
   } catch (error) {
     console.error('Error retrieving payroll reports:', error);
@@ -463,22 +467,22 @@ exports.getPayrollReports = async (req, res) => {
 exports.getPayrollReport = async (req, res) => {
   try {
     const { id } = req.params;
-    
+
     const report = await Payroll.getPayrollRunById(id);
-    
+
     if (!report) {
       return res.status(404).json(formatError({
         message: 'Payroll report not found'
       }));
     }
-    
+
     // Add email information for each employee in the report
     if (report.items && report.items.length > 0) {
       // Get all employee IDs from the payroll items
       const employeeIds = report.items
         .filter(item => item.employee_id)
         .map(item => item.employee_id);
-      
+
       if (employeeIds.length > 0) {
         // Get email information from the users table
         const [employees] = await db.query(`
@@ -487,13 +491,13 @@ exports.getPayrollReport = async (req, res) => {
           LEFT JOIN users u ON e.user_id = u.id
           WHERE e.id IN (${employeeIds.map(() => '?').join(',')})
         `, employeeIds);
-        
+
         // Create a map of employee_id to email
         const emailMap = {};
         for (const employee of employees) {
           emailMap[employee.id] = employee.email;
         }
-        
+
         // Add email to each payroll item
         for (const item of report.items) {
           if (item.employee_id && emailMap[item.employee_id]) {
@@ -502,7 +506,7 @@ exports.getPayrollReport = async (req, res) => {
         }
       }
     }
-    
+
     return res.status(200).json(formatSuccess('Payroll report retrieved successfully', report));
   } catch (error) {
     console.error('Error retrieving payroll report:', error);
@@ -518,22 +522,22 @@ exports.getPayrollReport = async (req, res) => {
 exports.downloadPaystub = async (req, res) => {
   try {
     const { payrollRunId, employeeId } = req.params;
-    
+
     // Get payroll run details
     const payrollRun = await Payroll.getPayrollRunById(payrollRunId);
-    
+
     if (!payrollRun) {
       return res.status(404).json(formatError({
         message: 'Payroll run not found'
       }));
     }
-    
+
     // Find the specific employee's payroll item
     const payrollItem = payrollRun.items.find(item =>
       (item.employee_id && item.employee_id.toString() === employeeId) ||
       (item.id && item.id.toString() === employeeId)
     );
-    
+
     if (!payrollItem) {
       return res.status(404).json(formatError('Employee payroll data not found'));
     }
@@ -549,7 +553,7 @@ exports.downloadPaystub = async (req, res) => {
     // Use custom dates if they were used during calculation, otherwise use default period dates
     const actualStartDate = payrollRun.custom_period_start || payrollRun.period_start;
     const actualEndDate = payrollRun.custom_period_end || payrollRun.period_end;
-    
+
     const periodData = {
       periodStart: actualStartDate ? new Date(actualStartDate).toLocaleDateString() : 'N/A',
       periodEnd: actualEndDate ? new Date(actualEndDate).toLocaleDateString() : 'N/A',
@@ -557,7 +561,7 @@ exports.downloadPaystub = async (req, res) => {
       // Include flag to indicate if custom dates were used
       usedCustomDates: !!(payrollRun.custom_period_start || payrollRun.custom_period_end)
     };
-    
+
     // Fetch employee details from database
     let employeeDetails = null;
     if (payrollItem.employee_id) {
@@ -566,7 +570,7 @@ exports.downloadPaystub = async (req, res) => {
           'SELECT * FROM employees WHERE id = ?',
           [payrollItem.employee_id]
         );
-        
+
         if (rows && rows.length > 0) {
           employeeDetails = rows[0];
           console.log(`Found employee details for ID ${payrollItem.employee_id}:`, employeeDetails);
@@ -575,7 +579,7 @@ exports.downloadPaystub = async (req, res) => {
         console.error('Error fetching employee details:', err);
       }
     }
-    
+
     // Get loan details if there's a loan deduction
     let loanDetails = [];
     if (payrollItem.loan_deduction && parseFloat(payrollItem.loan_deduction) > 0) {
@@ -594,7 +598,7 @@ exports.downloadPaystub = async (req, res) => {
         WHERE 
           lp.payroll_item_id = ?
       `, [payrollItem.id]);
-      
+
       if (loanPayments && loanPayments.length > 0) {
         loanDetails = loanPayments.map(payment => ({
           loanId: payment.loan_id,
@@ -607,22 +611,22 @@ exports.downloadPaystub = async (req, res) => {
         }));
       }
     }
-    
+
     // Get payroll settings for the PDF
     const [payrollSettings] = await db.query('SELECT * FROM payroll_settings LIMIT 1');
-    
+
     // Generate PDF with employee details, loan information, and payroll settings
-    const pdfBuffer = await generatePaystubPDF(payrollItem, periodData, { 
+    const pdfBuffer = await generatePaystubPDF(payrollItem, periodData, {
       employeeDetails,
       loanDetails,
       payrollSettings: payrollSettings[0] || {}
     });
-    
+
     // Set headers for PDF download
     res.setHeader('Content-Type', 'application/pdf');
     const employeeName = payrollItem.employeeName || payrollItem.employee_name || 'Unknown';
     res.setHeader('Content-Disposition', `attachment; filename=paystub-${employeeName.replace(/\s+/g, '-')}-${payrollRunId}.pdf`);
-    
+
     // Send the PDF
     return res.send(pdfBuffer);
   } catch (error) {
@@ -639,13 +643,13 @@ exports.downloadPaystub = async (req, res) => {
 exports.getPayrollSettings = async (req, res) => {
   try {
     const [settings] = await db.query('SELECT * FROM payroll_settings LIMIT 1');
-    
+
     if (settings.length === 0) {
       return res.status(404).json(formatError({
         message: 'Payroll settings not found'
       }));
     }
-    
+
     return res.status(200).json(formatSuccess('Payroll settings retrieved successfully', settings[0]));
   } catch (error) {
     console.error('Error retrieving payroll settings:', error);
@@ -691,7 +695,7 @@ exports.updatePayrollSettings = async (req, res) => {
       elReportNumberCurrent,
       elReportAutoIncrement
     } = req.body;
-    
+
     const [result] = await db.query(
       `UPDATE payroll_settings SET
         social_security_employee_rate = COALESCE(?, social_security_employee_rate),
@@ -753,16 +757,16 @@ exports.updatePayrollSettings = async (req, res) => {
         elReportAutoIncrement
       ]
     );
-    
+
     if (result.affectedRows === 0) {
       return res.status(404).json(formatError({
         message: 'Payroll settings not found'
       }));
     }
-    
+
     // Get the updated settings
     const [settings] = await db.query('SELECT * FROM payroll_settings LIMIT 1');
-    
+
     return res.status(200).json(formatSuccess('Payroll settings updated successfully', settings[0]));
   } catch (error) {
     console.error('Error updating payroll settings:', error);
@@ -817,19 +821,19 @@ exports.getDeductionsReport = async (req, res) => {
     if (format === 'csv') {
       // Create CSV content
       let csvContent = 'Employee ID,Name,Gross Pay,Net Pay,SS (EE),SS (ER),MB (EE),MB (ER),EL (EE),EL (ER)\n';
-      
+
       // Add data rows
       reportData.rows.forEach(row => {
         csvContent += `${row.employee_id},${row.name},${row.gross_pay},${row.net_pay},${row.ss_employee},${row.ss_employer},${row.mb_employee},${row.mb_employer},${row.el_employee},${row.el_employer}\n`;
       });
-      
+
       // Add totals row
       csvContent += `,,${reportData.totals.gross_pay},${reportData.totals.net_pay},${reportData.totals.ss_employee},${reportData.totals.ss_employer},${reportData.totals.mb_employee},${reportData.totals.mb_employer},${reportData.totals.el_employee},${reportData.totals.el_employer}\n`;
-      
+
       // Set headers for file download
       res.setHeader('Content-Type', 'text/csv');
       res.setHeader('Content-Disposition', `attachment; filename=deductions-report-${new Date().toISOString().split('T')[0]}.csv`);
-      
+
       // Send CSV response
       return res.send(csvContent);
     }
@@ -860,7 +864,7 @@ exports.getACHReport = async (req, res) => {
 
     // Get the ACH report data from the Payroll model
     const achReportData = await Payroll.generateACHReport(payrollRunId);
-    
+
     // Get third-party payments data for this payroll run
     const EmployeeLoan = require('../models/EmployeeLoan');
     const thirdPartyPayments = await EmployeeLoan.getThirdPartyPaymentsForPayrollRun(payrollRunId);
@@ -871,7 +875,7 @@ exports.getACHReport = async (req, res) => {
       // [A: Routing Number] [B: Account Number] [C: Ck/Sv] [D: Name] [E: City, Country] [F: Amount] [G: Credit]
       // Note: Headers are removed as per client's request
       let csvContent = '';
-      
+
       // Add data rows only for entries with valid banking information
       achReportData.items.forEach(item => {
         if (item.has_banking_info) {
@@ -879,7 +883,7 @@ exports.getACHReport = async (req, res) => {
           csvContent += `${item.routing_number},${item.account_number},${item.account_type},${item.employee_name},${item.institute},${item.amount},Cr\n`;
         }
       });
-      
+
       // Add third-party payments to the end of the CSV file using same format
       if (thirdPartyPayments && thirdPartyPayments.length > 0) {
         thirdPartyPayments.forEach(payment => {
@@ -890,16 +894,16 @@ exports.getACHReport = async (req, res) => {
             const reference = payment.third_party_reference ? ` - ${payment.third_party_reference}` : '';
             const institute = `Third-party payment${reference}`;
             const amount = parseFloat(payment.payment_amount).toFixed(2);
-            
+
             csvContent += `${payment.third_party_routing_number},${payment.third_party_account_number},Ck,${name},${institute},${amount},Cr\n`;
           }
         });
       }
-      
+
       // Set headers for file download
       res.setHeader('Content-Type', 'text/csv');
       res.setHeader('Content-Disposition', `attachment; filename=ach-report-${achReportData.payrollRun?.period_id || payrollRunId}-${new Date().toISOString().split('T')[0]}.csv`);
-      
+
       // Send CSV response
       return res.send(csvContent);
     }
@@ -909,9 +913,9 @@ exports.getACHReport = async (req, res) => {
     const maskedThirdPartyPayments = thirdPartyPayments.map(payment => {
       return {
         ...payment,
-        third_party_account_number: payment.third_party_account_number ? 
+        third_party_account_number: payment.third_party_account_number ?
           `XXXX${payment.third_party_account_number.slice(-4)}` : null,
-        third_party_routing_number: payment.third_party_routing_number ? 
+        third_party_routing_number: payment.third_party_routing_number ?
           `XXXX${payment.third_party_routing_number.slice(-4)}` : null
       };
     });
@@ -920,7 +924,7 @@ exports.getACHReport = async (req, res) => {
       payrollRun: achReportData.payrollRun,
       summary: {
         ...achReportData.summary,
-        third_party_payment_total: thirdPartyPayments.reduce((sum, payment) => 
+        third_party_payment_total: thirdPartyPayments.reduce((sum, payment) =>
           sum + parseFloat(payment.payment_amount || 0), 0).toFixed(2),
         third_party_payment_count: thirdPartyPayments.length
       },
@@ -950,39 +954,39 @@ exports.getACHReport = async (req, res) => {
 exports.emailPaystubs = async (req, res) => {
   try {
     const { payrollRunId, sendToAll = false, employeeIds = [] } = req.body;
-    
+
     if (!payrollRunId) {
       return res.status(400).json(formatError({
         message: 'Payroll run ID is required'
       }));
     }
-    
+
     // Get the payroll run data
     const payrollRun = await Payroll.getPayrollRunById(payrollRunId);
-    
+
     if (!payrollRun) {
       return res.status(404).json(formatError({
         message: 'Payroll run not found'
       }));
     }
-    
+
     // Filter payroll items if not sending to all
-    const payrollItems = sendToAll 
-      ? payrollRun.items 
-      : payrollRun.items.filter(item => 
-          employeeIds.includes(item.employee_id) || 
-          employeeIds.includes(item.employee_id?.toString())
-        );
-    
+    const payrollItems = sendToAll
+      ? payrollRun.items
+      : payrollRun.items.filter(item =>
+        employeeIds.includes(item.employee_id) ||
+        employeeIds.includes(item.employee_id?.toString())
+      );
+
     if (payrollItems.length === 0) {
       return res.status(400).json(formatError({
         message: 'No employees to send paystubs to'
       }));
     }
-    
+
     // Get employee email addresses
     const employeeEmails = [];
-    
+
     for (const item of payrollItems) {
       if (item.employee_id) {
         const [employees] = await db.query(
@@ -992,7 +996,7 @@ exports.emailPaystubs = async (req, res) => {
            WHERE e.id = ?`,
           [item.employee_id]
         );
-        
+
         if (employees.length > 0 && employees[0].email) {
           employeeEmails.push({
             id: item.employee_id,
@@ -1004,13 +1008,13 @@ exports.emailPaystubs = async (req, res) => {
         }
       }
     }
-    
+
     if (employeeEmails.length === 0) {
       return res.status(400).json(formatError({
         message: 'No employees with valid email addresses found'
       }));
     }
-    
+
     const transporter = nodemailer.createTransport({
       host: process.env.EMAIL_HOST,
       port: Number(process.env.EMAIL_PORT), // 465
@@ -1021,29 +1025,29 @@ exports.emailPaystubs = async (req, res) => {
       },
     });
 
-    
+
     // Get payroll settings for PDF generation
     const [payrollSettings] = await db.query('SELECT * FROM payroll_settings LIMIT 1');
-    
+
     // Prepare period data for PDF
     const periodData = {
       periodStart: payrollRun.period_start ? new Date(payrollRun.period_start).toLocaleDateString() : 'N/A',
       periodEnd: payrollRun.period_end ? new Date(payrollRun.period_end).toLocaleDateString() : 'N/A',
       payDate: payrollRun.pay_date ? new Date(payrollRun.pay_date).toLocaleDateString() : new Date().toLocaleDateString()
     };
-    
+
     // Prepare and send emails
     const emailResults = [];
     const emailTemplate = path.join(__dirname, '../views/paystub-email.ejs');
-    
+
     if (!fs.existsSync(emailTemplate)) {
       // Create a simple email template if it doesn't exist
       const templateDir = path.join(__dirname, '../views');
-      
+
       if (!fs.existsSync(templateDir)) {
         fs.mkdirSync(templateDir, { recursive: true });
       }
-      
+
       const defaultTemplate = `
         <!DOCTYPE html>
         <html>
@@ -1108,15 +1112,15 @@ exports.emailPaystubs = async (req, res) => {
         </body>
         </html>
       `;
-      
+
       fs.writeFileSync(emailTemplate, defaultTemplate);
     }
-    
+
     for (const employee of employeeEmails) {
       try {
         // Generate PDF for attachment
         let loanDetails = [];
-        
+
         // Get loan details if there's a loan deduction
         if (employee.payrollItem.loan_deduction && parseFloat(employee.payrollItem.loan_deduction) > 0) {
           // Get loan payment details for this payroll item
@@ -1134,7 +1138,7 @@ exports.emailPaystubs = async (req, res) => {
             WHERE 
               lp.payroll_item_id = ?
           `, [employee.payrollItem.id]);
-          
+
           if (loanPayments && loanPayments.length > 0) {
             loanDetails = loanPayments.map(payment => ({
               loanId: payment.loan_id,
@@ -1147,16 +1151,16 @@ exports.emailPaystubs = async (req, res) => {
             }));
           }
         }
-        
+
         // Generate PDF with employee details
-        const pdfBuffer = await generatePaystubPDF(employee.payrollItem, periodData, { 
+        const pdfBuffer = await generatePaystubPDF(employee.payrollItem, periodData, {
           employeeDetails: employee.employeeDetails,
           loanDetails,
           payrollSettings: payrollSettings[0] || {}
         });
-        
+
         const fileName = `paystub-${employee.name.replace(/\s+/g, '-')}-${payrollRun.period_start}-${payrollRun.period_end}.pdf`;
-        
+
         // Render email template
         const emailContent = await ejs.renderFile(emailTemplate, {
           employeeName: employee.name,
@@ -1175,7 +1179,7 @@ exports.emailPaystubs = async (req, res) => {
           ytdEducationLevy: parseFloat(employee.payrollItem.ytd_education_levy) || 0,
           ytdNetPay: parseFloat(employee.payrollItem.ytd_net_pay) || 0
         });
-        
+
         // Send email with PDF attachment
         const info = await transporter.sendMail({
           from: `"MSA Payroll System" <${process.env.EMAIL_FROM || process.env.EMAIL_USER}>`,
@@ -1190,7 +1194,7 @@ exports.emailPaystubs = async (req, res) => {
             }
           ]
         });
-        
+
         emailResults.push({
           employeeId: employee.id,
           name: employee.name,
@@ -1209,7 +1213,7 @@ exports.emailPaystubs = async (req, res) => {
         });
       }
     }
-    
+
     return res.status(200).json(formatSuccess('Paystubs emailed successfully', {
       total: employeeEmails.length,
       sent: emailResults.filter(r => r.status === 'sent').length,

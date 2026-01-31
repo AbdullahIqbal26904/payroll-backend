@@ -71,6 +71,7 @@ class Timesheet {
       const periodId = periodResult.insertId;
       
       // Prepare timesheet entries for batch insert
+      // Now includes is_lunch and lunch_hours columns for lunch time tracking
       const values = entries.map(entry => [
         periodId,
         entry.employeeId || null,
@@ -81,6 +82,8 @@ class Timesheet {
         entry.timeOut,
         entry.totalHours,
         entry.hoursDecimal || 0,
+        entry.isLunch || false,       // New: lunch flag
+        entry.lunchHours || 0,        // New: lunch hours (decimal)
         entry.deptCode,
         entry.inLocation,
         entry.inPunchMethod,
@@ -100,6 +103,8 @@ class Timesheet {
           time_out,
           total_hours,
           hours_decimal,
+          is_lunch,
+          lunch_hours,
           dept_code,
           in_location,
           in_punch_method,
@@ -128,6 +133,56 @@ class Timesheet {
         [periodId]
       );
       return entries;
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  /**
+   * Get lunch hours summary by period ID
+   * @param {number} periodId - Timesheet period ID
+   * @returns {Promise<Object>} Summary of work hours and lunch hours per employee
+   */
+  static async getLunchSummaryByPeriodId(periodId) {
+    try {
+      const [summary] = await db.query(
+        `SELECT 
+          employee_id,
+          CONCAT(first_name, ' ', last_name) as employee_name,
+          SUM(CASE WHEN is_lunch = 0 OR is_lunch IS NULL THEN hours_decimal ELSE 0 END) as work_hours,
+          SUM(CASE WHEN is_lunch = 1 THEN hours_decimal ELSE 0 END) as lunch_hours,
+          SUM(hours_decimal) as total_hours,
+          COUNT(CASE WHEN is_lunch = 1 THEN 1 END) as lunch_entries_count
+        FROM timesheet_entries 
+        WHERE period_id = ?
+        GROUP BY employee_id, first_name, last_name
+        ORDER BY last_name, first_name`,
+        [periodId]
+      );
+      
+      // Calculate totals
+      const totals = summary.reduce((acc, row) => {
+        acc.totalWorkHours += parseFloat(row.work_hours || 0);
+        acc.totalLunchHours += parseFloat(row.lunch_hours || 0);
+        acc.totalHours += parseFloat(row.total_hours || 0);
+        return acc;
+      }, { totalWorkHours: 0, totalLunchHours: 0, totalHours: 0 });
+      
+      return {
+        employees: summary.map(row => ({
+          employeeId: row.employee_id,
+          employeeName: row.employee_name,
+          workHours: parseFloat(row.work_hours || 0).toFixed(2),
+          lunchHours: parseFloat(row.lunch_hours || 0).toFixed(2),
+          totalHours: parseFloat(row.total_hours || 0).toFixed(2),
+          lunchEntriesCount: row.lunch_entries_count
+        })),
+        totals: {
+          workHours: totals.totalWorkHours.toFixed(2),
+          lunchHours: totals.totalLunchHours.toFixed(2),
+          totalHours: totals.totalHours.toFixed(2)
+        }
+      };
     } catch (error) {
       throw error;
     }
