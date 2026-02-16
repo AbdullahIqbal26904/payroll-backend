@@ -426,9 +426,15 @@ class EmployeeVacation {
           const vacationPay = parseFloat(vacation.total_hours) * hourlyRate;
           totalVacationPay += vacationPay;
         } else if (employeeData.employee_type === 'salary') {
-          // For salaried employees, vacation pay is included in their regular salary
-          // We still track the hours but don't add additional pay
-          totalVacationPay = 0; // Will be handled by regular salary calculation
+          // For salaried employees, calculate vacation pay based on derived hourly rate
+          // Vacation pay is added on top of the base salary for paid vacations
+          const salaryAmount = employeeData.salary_amount !== undefined ? employeeData.salary_amount : 
+                              (employeeData.salary !== undefined ? employeeData.salary : 0);
+          const weeklyHours = employeeData.standard_hours || 40;
+          const monthlyHours = weeklyHours * 4.33;
+          const derivedHourlyRate = vacation.hourly_rate || (monthlyHours > 0 ? salaryAmount / monthlyHours : 0);
+          const vacationPay = parseFloat(vacation.total_hours) * derivedHourlyRate;
+          totalVacationPay += vacationPay;
         } else if (employeeData.employee_type === 'private_duty_nurse') {
           // For private duty nurses, use their specified hourly rate
           const hourlyRate = vacation.hourly_rate || employeeData.hourly_rate;

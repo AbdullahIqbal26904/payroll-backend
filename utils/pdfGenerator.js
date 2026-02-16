@@ -165,8 +165,6 @@ const generatePaystubPDF = async (payrollItem, periodData, options = {}) => {
       
       // Handle data for earnings calculations
       const hoursWorked = payrollItem.hoursWorked || payrollItem.hours_worked || 0;
-      const overtimeHours = payrollItem.overtimeHours || payrollItem.overtime_hours || 0;
-      const overtimeAmount = parseFloat(payrollItem.overtimeAmount || payrollItem.overtime_amount || 0).toFixed(2);
       
       // Get lunch hours data
       const lunchHours = payrollItem.lunchHours || payrollItem.lunch_hours || 0;
@@ -180,9 +178,24 @@ const generatePaystubPDF = async (payrollItem, periodData, options = {}) => {
       const holidayHours = payrollItem.holidayHours || payrollItem.holiday_hours || 0;
       const holidayAmount = parseFloat(payrollItem.holidayAmount || payrollItem.holiday_amount || 0).toFixed(2);
       
-      // Calculate regular earnings (gross pay minus overtime, vacation, and holiday pay)
+      // Get leave hours and pay
+      const leaveHours = payrollItem.leaveHours || payrollItem.leave_hours || 0;
+      const leaveAmount = parseFloat(payrollItem.leaveAmount || payrollItem.leave_amount || 0).toFixed(2);
+      const leaveType = payrollItem.leaveType || payrollItem.leave_type || 'Leave';
+      
+      // Calculate regular earnings (gross pay minus vacation, holiday, and leave pay)
       const grossPay = parseFloat(payrollItem.grossPay || payrollItem.gross_pay || 0).toFixed(2);
-      const regularEarnings = (parseFloat(grossPay) - parseFloat(overtimeAmount) - parseFloat(vacationAmount) - parseFloat(holidayAmount)).toFixed(2);
+      const employeeTypeForEarnings = payrollItem.employee_type || employeeType || '';
+      
+      // For salary employees, show the actual monthly salary as regular earnings
+      // For hourly/nurse employees, show worked hours pay (gross minus additions)
+      let regularEarnings;
+      if (employeeTypeForEarnings === 'salary') {
+        // Use the employee's actual monthly salary from employee details
+        regularEarnings = parseFloat(salaryAmount || 0).toFixed(2);
+      } else {
+        regularEarnings = (parseFloat(grossPay) - parseFloat(vacationAmount) - parseFloat(holidayAmount) - parseFloat(leaveAmount)).toFixed(2);
+      }
       
       // Setup for earnings detail rows - reduced height for compact layout
       const rowHeight = 18; // Smaller row height
@@ -213,27 +226,28 @@ const generatePaystubPDF = async (payrollItem, periodData, options = {}) => {
          .text(`$${regularEarnings}`, leftTableX + colWidth * 2, currentY + 5, { width: colWidth - 10, align: 'right' });
       
       
-      // Add overtime line if applicable - more compact
-      if (parseFloat(overtimeHours) > 0 && parseFloat(overtimeAmount) > 0) {
-        currentY += rowHeight;
-        doc.rect(leftTableX, currentY, halfTableWidth, rowHeight)
-           .fillAndStroke(colors.lightGray, colors.border);
-           
-        doc.fillColor(colors.text).fontSize(8).font('Helvetica')
-           .text('Overtime (1.5x)', leftTableX + 5, currentY + 5, { width: colWidth - 5, align: 'left' })
-           .text(overtimeHours.toString(), leftTableX + colWidth, currentY + 5, { width: colWidth - 5, align: 'right' })
-           .text(`$${overtimeAmount}`, leftTableX + colWidth * 2, currentY + 5, { width: colWidth - 10, align: 'right' });
-      }
-      
       // Add vacation pay if applicable - more compact
       if (parseFloat(vacationHours) > 0 || parseFloat(vacationAmount) > 0) {
         currentY += rowHeight;
         doc.rect(leftTableX, currentY, halfTableWidth, rowHeight)
            .fillAndStroke('white', colors.border);
+        const vacationLabel = 'Vacation Pay';
         doc.fillColor(colors.text).fontSize(8).font('Helvetica')
-           .text('Vacation Pay', leftTableX + 5, currentY + 5, { width: colWidth - 5, align: 'left' })
+           .text(vacationLabel, leftTableX + 5, currentY + 5, { width: colWidth - 5, align: 'left' })
            .text(vacationHours.toString(), leftTableX + colWidth, currentY + 5, { width: colWidth - 5, align: 'right' })
            .text(`$${vacationAmount}`, leftTableX + colWidth * 2, currentY + 5, { width: colWidth - 10, align: 'right' });
+      }
+
+      // Add leave pay row if applicable (sick/maternity leave)
+      if (parseFloat(leaveHours) > 0 || parseFloat(leaveAmount) > 0) {
+        currentY += rowHeight;
+        doc.rect(leftTableX, currentY, halfTableWidth, rowHeight)
+           .fillAndStroke(colors.lightGray, colors.border);
+        const leaveLabel = leaveType ? `${leaveType.charAt(0).toUpperCase() + leaveType.slice(1)} Leave Pay` : 'Leave Pay';
+        doc.fillColor(colors.text).fontSize(8).font('Helvetica')
+           .text(leaveLabel, leftTableX + 5, currentY + 5, { width: colWidth - 5, align: 'left' })
+           .text(parseFloat(leaveHours).toFixed(2), leftTableX + colWidth, currentY + 5, { width: colWidth - 5, align: 'right' })
+           .text(`$${leaveAmount}`, leftTableX + colWidth * 2, currentY + 5, { width: colWidth - 10, align: 'right' });
       }
 
       // Add paid holiday row if applicable
