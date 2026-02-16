@@ -443,10 +443,10 @@ async function run() {
     const sal = byId['SAL001'];
     assert(sal, 'Salaried employee item present');
     // Monthly salary 6000; weekly period but payment_frequency Monthly => payPeriods=1 baseSalaryForPeriod=6000
-    // Worked 32h + leave 8h = 40h; standardHoursPerPeriod for Monthly = 40*4 = 160; total (40) < standard 160 => proration 40/160=0.25 => 1500
+    // No proration: salaried employees always receive full base salary for the period
     // Holiday pay added: salaried gets holidayPay extra: holiday hours = 8, hourlyRate for salary = (6000*12)/(52*40)=~34.62; holidayPay ~ 276.92; leave amount also added
     const salaryHourlyRate = (6000 * 12) / (52 * 40); // ≈ 34.615
-    const expectedSalaryProrated = 6000 * (40 / (40 * 4)); // 1500
+    const expectedSalaryBase = 6000; // Full base salary (no proration)
     const expectedSalaryHoliday = 8 * salaryHourlyRate; // ~276.92
     // Leave amount: for salary, EmployeeLeave.calculateLeaveForPeriod computes using effectiveHourlyRate from salary_amount with standard_hours or default 80 per period.
     // With default standard_hours for salary in leave model: standardHoursPerPeriod = employee.standard_hours || 80 -> our employee has 40 so uses 40.
@@ -454,7 +454,7 @@ async function run() {
     const payPerPeriod = 6000 / 26;
     const effectiveHourly = payPerPeriod / 40;
     const expectedLeaveAmount = 8 * effectiveHourly;
-    const expectedSalaryGross = expectedSalaryProrated + expectedSalaryHoliday + expectedLeaveAmount;
+    const expectedSalaryGross = expectedSalaryBase + expectedSalaryHoliday + expectedLeaveAmount;
     assert(nearly(parseFloat(sal.gross_pay), expectedSalaryGross, 0.5), `Salary gross expected ~${expectedSalaryGross.toFixed(2)}, got ${sal.gross_pay}`);
     // Third-party loan 100
     assert(nearly(parseFloat(sal.third_party_deduction), 100), 'Salary third-party loan 100');

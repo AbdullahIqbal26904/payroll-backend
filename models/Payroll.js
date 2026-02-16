@@ -282,9 +282,7 @@ class Payroll {
               const baseSalaryForPeriod = salaryAmount / payPeriods;
               
               // Calculate standard hours for the period based on payment frequency
-              // First check if employee has custom standard hours defined
-              // Fix for salary proration issue: Now calculating based on employee's actual standard hours
-              // rather than using fixed values that might not match the employee's expected monthly hours
+              // Used for determining overtime
               const employeeStandardHours = employeeData.standard_hours || 40; // Default to 40 hours per week
               
               let standardHoursPerPeriod;
@@ -312,28 +310,15 @@ class Payroll {
               regularHours = Math.min(actualWorkedHours, standardHoursPerPeriod);
               overtimeHours = Math.max(0, actualWorkedHours - standardHoursPerPeriod);
               
-              // Get total hours including worked hours, vacation hours, and leave hours
-              // For salaried employees, both vacation and leave hours should count as worked hours for proration
-              const totalWorkedHours = actualWorkedHours + vacationHoursForPeriod + leaveHoursForPeriod;
-              
               // Calculate hourly rate for overtime calculation
               // Hourly Rate = Monthly Salary / Total Monthly Hours
               const weeklyHours = employeeStandardHours;
               const monthlyHours = weeklyHours * 4.33; // 4.33 weeks per month average
               const salaryHourlyRate = salaryAmount / monthlyHours;
               
-              // Prorate salary based on total hours (worked + vacation + leave) vs expected hours
-              // Only prorate if total hours is less than standard hours
-              if (totalWorkedHours < standardHoursPerPeriod) {
-                const proratedFactor = totalWorkedHours / standardHoursPerPeriod;
-                grossPay = baseSalaryForPeriod * proratedFactor;
-                console.log(`Prorating salary: ${actualWorkedHours} worked hours + ${vacationHoursForPeriod} vacation hours + ${leaveHoursForPeriod} leave hours = ${totalWorkedHours} total hours out of ${standardHoursPerPeriod} standard hours`);
-                console.log(`Proration factor: ${proratedFactor.toFixed(4)}, Base salary: ${baseSalaryForPeriod}, Prorated salary: ${grossPay}`);
-              } else {
-                // No proration needed - pay full salary
-                grossPay = baseSalaryForPeriod;
-                console.log(`No proration: ${actualWorkedHours} worked hours + ${vacationHoursForPeriod} vacation hours + ${leaveHoursForPeriod} leave hours = ${totalWorkedHours} total hours meets or exceeds ${standardHoursPerPeriod} standard hours`);
-              }
+              // Pay full base salary for the period (no proration)
+              grossPay = baseSalaryForPeriod;
+              console.log(`Salary pay: Base salary for period = ${baseSalaryForPeriod}, Worked hours: ${actualWorkedHours}, Vacation hours: ${vacationHoursForPeriod}, Leave hours: ${leaveHoursForPeriod}`);
               
               // Calculate overtime pay for hours worked beyond standard hours
               // Overtime is paid at 1.5x the hourly rate
@@ -355,7 +340,7 @@ class Payroll {
               
               // Log vacation hours if any
               if (vacationData.vacationHours > 0) {
-                console.log(`Salaried employee vacation: ${vacationData.vacationHours} hours (included in worked hours for proration)`);
+                console.log(`Salaried employee vacation: ${vacationData.vacationHours} hours`);
               }
               
               // For salaried employees, holiday pay is extra (added to salary)
@@ -368,7 +353,7 @@ class Payroll {
               }
               
               payType = 'salary';
-              console.log(`Calculated salary pay: Base ${grossPay.toFixed(2)} (including proration/overtime), Holiday Pay ${holidayData.holidayPay}, Leave Pay ${leaveData.leaveAmount}`);
+              console.log(`Calculated salary pay: Base ${grossPay.toFixed(2)} (including overtime), Holiday Pay ${holidayData.holidayPay}, Leave Pay ${leaveData.leaveAmount}`);
               break;
               
             case 'private_duty_nurse':

@@ -6,8 +6,7 @@ The payroll system now supports two distinct employee types with different compe
 
 1. **Salaried Employees**
    - Paid a flat monthly rate
-   - Required to work a standard 40-hour week to receive full salary
-   - Salary is prorated if they work less than the standard hours
+   - Full salary is paid regardless of hours worked
    - Overtime is paid at 1.5x rate for hours over the standard
    - Overtime rate is calculated as: `(annual_salary / 52 weeks / 40 hours) * 1.5`
 
@@ -29,8 +28,7 @@ Two migrations have been added:
 The payroll calculation logic now differentiates between salaried and hourly employees:
 
 - **Salaried Employees**:
-  - Full salary is paid if they work at least the standard hours
-  - Salary is prorated if they work less than the standard hours
+  - Full salary is always paid for the period
   - Overtime is calculated for hours over the standard
 
 - **Hourly Employees**:

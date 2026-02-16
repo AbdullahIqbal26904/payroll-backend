@@ -96,14 +96,7 @@ const generatePaystubPDF = async (payrollItem, periodData, options = {}) => {
       const salaryAmount = employeeDetails.salary_amount  || 0;
       const standardHours = employeeDetails.standard_hours  || 40;
       
-      // Get vacation hours for prorating calculation
-      const vacationHoursForProrating = payrollItem.vacationHours || payrollItem.vacation_hours || 0;
-      
-      // Calculate if salary is prorated based on hours worked compared to standard
       const regularHours = payrollItem.regular_hours ||  0;
-      // For salary employees, consider both regular hours and vacation hours for prorating
-      const totalHoursForProrating = employeeType === 'salary' ? parseFloat(regularHours) + parseFloat(vacationHoursForProrating) : parseFloat(regularHours);
-      const isProrated = employeeType === 'salary' && totalHoursForProrating < (standardHours * 4);
       
       // Create two columns for employee info - more compact
       doc.fillColor(colors.text).fontSize(9).font('Helvetica');
@@ -128,11 +121,6 @@ const generatePaystubPDF = async (payrollItem, periodData, options = {}) => {
       // Right column - reduced vertical spacing
       if (employeeType === 'salary') {
         doc.text(`Monthly Salary: $${parseFloat(salaryAmount || 0).toFixed(2)}`, col2X, empInfoContentY);
-        if (isProrated) {
-          // Display both regular and vacation hours in prorating calculation
-          const vacationDisplay = parseFloat(vacationHoursForProrating) > 0 ? ` (incl. ${vacationHoursForProrating} vacation hrs)` : '';
-          doc.text(`Status: Prorated (${totalHoursForProrating}/${standardHours * 4} hrs${vacationDisplay})`, col2X, empInfoContentY + 14);
-        }
       } else if (employeeType === 'private_duty_nurse') {
         // Get private duty nurse rates from payroll settings if available
         const nurseSetting = options.payrollSettings || {};
@@ -210,9 +198,7 @@ const generatePaystubPDF = async (payrollItem, periodData, options = {}) => {
       } else if (isHourly) {
         calculationDescription = `Hourly Pay`;
       } else {
-        // For salaried employees, mention if it's prorated and include vacation hours in calculation
-        const isProrated = totalHoursForProrating < standardHours * 4;
-        calculationDescription = `Regular Salary${isProrated ? ' (Prorated)' : ''}`;
+        calculationDescription = `Regular Salary`;
       }
       
       // Alternate row background colors - using halfTableWidth
@@ -565,7 +551,7 @@ const generatePaystubPDF = async (payrollItem, periodData, options = {}) => {
          
       doc.fillColor(colors.text).fontSize(8).font('Helvetica')
          .text('Hours Worked', leftTableX + 5, currentYtdY + 4, { width: ytdColWidth - 5, align: 'left' })
-         .text(`${employeeType === 'salary' ? totalHoursForProrating : regularHours}`, leftTableX + ytdColWidth, currentYtdY + 4, { width: ytdColWidth - 5, align: 'center' })
+         .text(`${regularHours}`, leftTableX + ytdColWidth, currentYtdY + 4, { width: ytdColWidth - 5, align: 'center' })
          .text(`${ytdHoursWorked}`, leftTableX + ytdColWidth * 2, currentYtdY + 4, { width: ytdColWidth - 5, align: 'right' });
       
       currentYtdY += ytdRowHeight;
