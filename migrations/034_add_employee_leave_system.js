@@ -30,7 +30,7 @@ async function up(connection) {
       total_hours DECIMAL(10, 2) NOT NULL DEFAULT 0.00,
       hourly_rate DECIMAL(10, 2),
       status ENUM('pending', 'approved', 'cancelled') DEFAULT 'pending',
-      leave_type ENUM('sick', 'maternity') NOT NULL,
+      leave_type ENUM('maternity', 'compassionate', 'uncertified_sick', 'certified_sick') NOT NULL,
       payment_percentage DECIMAL(5, 2) DEFAULT 100.00,
       created_by INT NOT NULL,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,

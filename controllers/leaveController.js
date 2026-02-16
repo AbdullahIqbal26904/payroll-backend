@@ -16,8 +16,9 @@ exports.createLeave = async (req, res) => {
     }
     
     // Validate leave_type
-    if (!['sick', 'maternity'].includes(leaveData.leave_type)) {
-      return res.status(400).json(formatError('Invalid leave type. Must be either "sick" or "maternity"'));
+    const validLeaveTypes = ['maternity', 'compassionate', 'uncertified_sick', 'certified_sick'];
+    if (!validLeaveTypes.includes(leaveData.leave_type)) {
+      return res.status(400).json(formatError('Invalid leave type. Must be one of: maternity, compassionate, uncertified_sick, certified_sick'));
     }
     
     const leave = await EmployeeLeave.create(leaveData, userId);
@@ -40,8 +41,9 @@ exports.updateLeave = async (req, res) => {
     const leaveData = req.body;
     
     // Validate leave_type if provided
-    if (leaveData.leave_type && !['sick', 'maternity'].includes(leaveData.leave_type)) {
-      return res.status(400).json(formatError('Invalid leave type. Must be either "sick" or "maternity"'));
+    const validLeaveTypes = ['maternity', 'compassionate', 'uncertified_sick', 'certified_sick'];
+    if (leaveData.leave_type && !validLeaveTypes.includes(leaveData.leave_type)) {
+      return res.status(400).json(formatError('Invalid leave type. Must be one of: maternity, compassionate, uncertified_sick, certified_sick'));
     }
     
     // Validate payment_percentage if provided (should be between 0 and 100)
