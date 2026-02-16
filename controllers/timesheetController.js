@@ -32,13 +32,20 @@ const parseDate = function(dateString) {
       date = parse(normalizedInput, 'M/d/yyyy', new Date());
       if (isNaN(date.getTime())) throw new Error('Invalid date');
     }
-    return date.toISOString().split('T')[0];
+    // Use local getters to avoid UTC timezone shift from toISOString()
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const dd = String(date.getDate()).padStart(2, '0');
+    return `${y}-${m}-${dd}`;
   } catch (e) {
     // Try other formats if needed
     try {
       date = new Date(normalizedInput);
       if (isNaN(date.getTime())) throw new Error('Invalid date');
-      return date.toISOString().split('T')[0];
+      const y2 = date.getFullYear();
+      const m2 = String(date.getMonth() + 1).padStart(2, '0');
+      const dd2 = String(date.getDate()).padStart(2, '0');
+      return `${y2}-${m2}-${dd2}`;
     } catch (e2) {
       throw new Error(`Could not parse date: ${dateString}`);
     }

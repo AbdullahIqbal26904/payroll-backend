@@ -7,6 +7,7 @@
 const PDFDocument = require('pdfkit');
 const db = require('../config/db');
 const Payroll = require('../models/Payroll');
+const { formatDisplayDate, formatDisplayDateLong, formatDisplayDateRange, formatMonthYearShort, formatMonthYearLong, getCurrentDisplayDate } = require('./helpers');
 
 /**
  * Format monetary values consistently with 2 decimal places
@@ -371,11 +372,7 @@ const addFooter = (doc, x, y, styling) => {
   doc.fillColor(colors.text).fontSize(fonts.small.size).font(fonts.normal.font);
   
   // Add generated date
-  const currentDate = new Date().toLocaleDateString('en-US', { 
-    year: 'numeric', 
-    month: 'long', 
-    day: 'numeric' 
-  });
+  const currentDate = getCurrentDisplayDate();
   
   doc.text(`Generated on: ${currentDate}`, x, y, { align: 'center' });
 };
@@ -387,11 +384,7 @@ const addFooter = (doc, x, y, styling) => {
  * @returns {string} Formatted date range string
  */
 const formatDateRange = (startDate, endDate) => {
-  const start = new Date(startDate);
-  const end = new Date(endDate);
-  
-  const options = { year: 'numeric', month: 'long', day: 'numeric' };
-  return `${start.toLocaleDateString('en-US', options)} to ${end.toLocaleDateString('en-US', options)}`;
+  return formatDisplayDateRange(startDate, endDate);
 };
 
 /**
@@ -448,10 +441,7 @@ const generateSocialSecurityPDF = async ({ payrollRunId, payrollRunData, reportN
       
       // Format the date for the report (e.g. Jul-25)
       const payDate = new Date(payrollRunData.pay_date);
-      const monthYear = payDate.toLocaleDateString('en-US', { 
-        month: 'short', 
-        year: '2-digit'
-      });
+      const monthYear = formatMonthYearShort(payDate);
       
       // Add report header with centered formatting
       doc.fontSize(14).font('Helvetica-Bold')
@@ -769,10 +759,7 @@ const generateMedicalBenefitsPDF = async ({ payrollRunId, payrollRunData, report
       
       // Format the date for the report (e.g. Jul-25)
       const payDate = new Date(payrollRunData.pay_date);
-      const monthYear = payDate.toLocaleDateString('en-US', { 
-        month: 'short', 
-        year: '2-digit'
-      });
+      const monthYear = formatMonthYearShort(payDate);
       
       // Add report header with centered formatting
       doc.fontSize(14).font('Helvetica-Bold')
@@ -1062,10 +1049,7 @@ const generateEducationLevyPDF = async ({ payrollRunId, payrollRunData, reportNu
       const { colors, fonts } = styling;
       
       // Format dates for display
-      const monthYear = new Date(payrollRunData.pay_period_end).toLocaleDateString('en-US', { 
-        month: 'long', 
-        year: 'numeric'
-      });
+      const monthYear = formatMonthYearLong(payrollRunData.pay_period_end);
       
       // Add report header with centered formatting (matching other reports)
       doc.fontSize(14).font('Helvetica-Bold')
@@ -1287,7 +1271,7 @@ const generateEducationLevyPDF = async ({ payrollRunId, payrollRunData, reportNu
       // Add generation date at bottom
       currentY += rowHeight + 20;
       
-      doc.fontSize(8).font('Helvetica-Oblique').text(`Generated on ${new Date().toLocaleDateString()}`, 
+      doc.fontSize(8).font('Helvetica-Oblique').text(`Generated on ${getCurrentDisplayDate()}`, 
         startX, doc.page.height - 50, { align: 'center', width: tableWidth });
       
       // Finalize the PDF and end the stream
@@ -1318,7 +1302,7 @@ const generateReportData = async (reportType, payrollRunId) => {
     reportType,
     reportNumber: reportNumberDetails.formatted,
     payrollRunId,
-    payDate: payrollRunInfo ? new Date(payrollRunInfo.pay_date).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : '',
+    payDate: payrollRunInfo ? formatDisplayDateLong(payrollRunInfo.pay_date) : '',
     period: payrollRunInfo ? formatDateRange(payrollRunInfo.pay_period_start, payrollRunInfo.pay_period_end) : '',
     generatedAt: new Date().toISOString(),
     rows: [],

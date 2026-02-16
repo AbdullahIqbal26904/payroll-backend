@@ -3,7 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const csv = require('csv-parser');
 const multer = require('multer');
-const { formatSuccess, formatError } = require('../utils/helpers');
+const { formatSuccess, formatError, formatDisplayDate } = require('../utils/helpers');
 const Timesheet = require('../models/Timesheet');
 const Payroll = require('../models/Payroll');
 const nodemailer = require('nodemailer');
@@ -255,13 +255,20 @@ exports.parseDate = function (dateString) {
       date = parse(normalizedInput, 'M/d/yyyy', new Date());
       if (isNaN(date.getTime())) throw new Error('Invalid date');
     }
-    return date.toISOString().split('T')[0];
+    // Use local getters to avoid UTC timezone shift from toISOString()
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const dd = String(date.getDate()).padStart(2, '0');
+    return `${y}-${m}-${dd}`;
   } catch (e) {
     // Try other formats if needed
     try {
       date = new Date(normalizedInput);
       if (isNaN(date.getTime())) throw new Error('Invalid date');
-      return date.toISOString().split('T')[0];
+      const y2 = date.getFullYear();
+      const m2 = String(date.getMonth() + 1).padStart(2, '0');
+      const dd2 = String(date.getDate()).padStart(2, '0');
+      return `${y2}-${m2}-${dd2}`;
     } catch (e2) {
       throw new Error(`Could not parse date: ${dateString}`);
     }
@@ -555,9 +562,9 @@ exports.downloadPaystub = async (req, res) => {
     const actualEndDate = payrollRun.custom_period_end || payrollRun.period_end;
 
     const periodData = {
-      periodStart: actualStartDate ? new Date(actualStartDate).toLocaleDateString() : 'N/A',
-      periodEnd: actualEndDate ? new Date(actualEndDate).toLocaleDateString() : 'N/A',
-      payDate: payrollRun.pay_date ? new Date(payrollRun.pay_date).toLocaleDateString() : new Date().toLocaleDateString(),
+      periodStart: formatDisplayDate(actualStartDate),
+      periodEnd: formatDisplayDate(actualEndDate),
+      payDate: formatDisplayDate(payrollRun.pay_date || new Date()),
       // Include flag to indicate if custom dates were used
       usedCustomDates: !!(payrollRun.custom_period_start || payrollRun.custom_period_end)
     };
@@ -604,7 +611,7 @@ exports.downloadPaystub = async (req, res) => {
           loanId: payment.loan_id,
           paymentAmount: payment.payment_amount,
           remainingBalance: payment.remaining_balance,
-          expectedEndDate: payment.expected_end_date ? new Date(payment.expected_end_date).toLocaleDateString() : null,
+          expectedEndDate: formatDisplayDate(payment.expected_end_date),
           loan_type: payment.loan_type || 'internal',
           third_party_name: payment.third_party_name,
           third_party_reference: payment.third_party_reference
@@ -832,7 +839,7 @@ exports.getDeductionsReport = async (req, res) => {
 
       // Set headers for file download
       res.setHeader('Content-Type', 'text/csv');
-      res.setHeader('Content-Disposition', `attachment; filename=deductions-report-${new Date().toISOString().split('T')[0]}.csv`);
+      res.setHeader('Content-Disposition', `attachment; filename=deductions-report-${formatDisplayDate(new Date()).replace(/\//g, '-')}.csv`);
 
       // Send CSV response
       return res.send(csvContent);
@@ -902,7 +909,7 @@ exports.getACHReport = async (req, res) => {
 
       // Set headers for file download
       res.setHeader('Content-Type', 'text/csv');
-      res.setHeader('Content-Disposition', `attachment; filename=ach-report-${achReportData.payrollRun?.period_id || payrollRunId}-${new Date().toISOString().split('T')[0]}.csv`);
+      res.setHeader('Content-Disposition', `attachment; filename=ach-report-${achReportData.payrollRun?.period_id || payrollRunId}-${formatDisplayDate(new Date()).replace(/\//g, '-')}.csv`);
 
       // Send CSV response
       return res.send(csvContent);
@@ -1031,9 +1038,9 @@ exports.emailPaystubs = async (req, res) => {
 
     // Prepare period data for PDF
     const periodData = {
-      periodStart: payrollRun.period_start ? new Date(payrollRun.period_start).toLocaleDateString() : 'N/A',
-      periodEnd: payrollRun.period_end ? new Date(payrollRun.period_end).toLocaleDateString() : 'N/A',
-      payDate: payrollRun.pay_date ? new Date(payrollRun.pay_date).toLocaleDateString() : new Date().toLocaleDateString()
+      periodStart: formatDisplayDate(payrollRun.period_start),
+      periodEnd: formatDisplayDate(payrollRun.period_end),
+      payDate: formatDisplayDate(payrollRun.pay_date || new Date())
     };
 
     // Prepare and send emails
@@ -1144,7 +1151,7 @@ exports.emailPaystubs = async (req, res) => {
               loanId: payment.loan_id,
               paymentAmount: payment.payment_amount,
               remainingBalance: payment.remaining_balance,
-              expectedEndDate: payment.expected_end_date ? new Date(payment.expected_end_date).toLocaleDateString() : null,
+              expectedEndDate: formatDisplayDate(payment.expected_end_date),
               loan_type: payment.loan_type || 'internal',
               third_party_name: payment.third_party_name,
               third_party_reference: payment.third_party_reference

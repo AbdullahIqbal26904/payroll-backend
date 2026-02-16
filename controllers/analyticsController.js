@@ -4,6 +4,7 @@ const PublicHoliday = require('../models/PublicHoliday');
 const EmployeeVacation = require('../models/EmployeeVacation');
 const EmployeeLeave = require('../models/EmployeeLeave');
 const EmployeeLoan = require('../models/EmployeeLoan');
+const { formatDisplayDate } = require('../utils/helpers');
 
 /**
  * @class AnalyticsController
@@ -722,7 +723,7 @@ class AnalyticsController {
           recent_payrolls: recentPayrolls,
           employees_on_leave: employeesOnLeave,
           employees_on_vacation: employeesOnVacation,
-          as_of_date: today.toISOString().split('T')[0]
+          as_of_date: formatDisplayDate(today)
         };
         
         res.status(200).json({

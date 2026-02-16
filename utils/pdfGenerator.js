@@ -1,6 +1,7 @@
 const PDFDocument = require('pdfkit');
 const fs = require('fs');
 const path = require('path');
+const { getCurrentDisplayDate } = require('./helpers');
 
 /**
  * Generate a paystub PDF
@@ -817,7 +818,7 @@ const generatePaystubPDF = async (payrollItem, periodData, options = {}) => {
          
       doc.fillColor(colors.text).fontSize(7).font('Helvetica')
          .text('This is an electronic paystub and does not require a signature.', margin + 10, footerY-30, { width: 300, align: 'left' })
-         .text(`Generated: ${new Date().toLocaleDateString()}`, pageWidth - (margin + 80), footerY-30, { width: 70, align: 'right' });
+         .text(`Generated: ${getCurrentDisplayDate()}`, pageWidth - (margin + 100), footerY-30, { width: 90, align: 'right' });
       
       // Add a subtle watermark that won't cause page issues
       doc.fillOpacity(0.05)
