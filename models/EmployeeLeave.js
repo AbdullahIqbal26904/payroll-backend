@@ -457,6 +457,7 @@ class EmployeeLeave {
         totalLeaveHours += parseFloat(leave.total_hours);
         
         // Calculate leave pay based on employee type and payment percentage
+        // Supervisors use the same leave calculation as salaried employees
         if (employeeData.employee_type === 'hourly') {
           // For hourly employees, use the leave's hourly_rate if specified, 
           // otherwise use the employee's standard hourly rate
@@ -464,8 +465,8 @@ class EmployeeLeave {
           const paymentPercentage = leave.payment_percentage / 100;
           const leaveAmount = parseFloat(leave.total_hours) * hourlyRate * paymentPercentage;
           totalLeaveAmount += leaveAmount;
-        } else if (employeeData.employee_type === 'salary') {
-          // For salaried employees, calculate leave pay based on their equivalent hourly rate
+        } else if (employeeData.employee_type === 'salary' || employeeData.employee_type === 'supervisor') {
+          // For salaried employees and supervisors, calculate leave pay based on their equivalent hourly rate
           const standardHoursPerPeriod = employeeData.standard_hours || 80; // Default bi-weekly
           const standardPayPeriods = 26; // Bi-weekly
           const yearlyPay = employeeData.salary_amount;

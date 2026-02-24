@@ -447,6 +447,29 @@ class Payroll {
               // console.log(`Holiday hours: ${holidayData.holidayHours} with pay = ${holidayData.holidayPay}`);
               // console.log(`Total hourly pay: ${grossPay} (regular + vacation + leave + holiday)`);
               break;
+              
+            case 'supervisor':
+              // Supervisors are salaried but do NOT receive overtime, vacation pay, or holiday pay
+              const supervisorPayPeriods = employeeData.payment_frequency === 'Semi-Monthly' ? 2 : (employeeData.payment_frequency === 'Bi-Weekly' ? 2 : 1);
+              const supervisorSalary = employeeData.salary_amount !== undefined ? employeeData.salary_amount : 
+                                      (employeeData.salary !== undefined ? employeeData.salary : 0);
+              
+              // Calculate base salary for the period
+              const supervisorBaseSalary = supervisorSalary / supervisorPayPeriods;
+              
+              // All worked hours are regular hours (no overtime for supervisors)
+              regularHours = employeeInfo.workHours;
+              
+              // Supervisors get base salary only - no vacation pay, no holiday pay
+              grossPay = supervisorBaseSalary;
+              
+              // Add leave pay (sick/maternity leave still applies)
+              grossPay += leaveData.leaveAmount;
+              
+              payType = 'supervisor';
+              console.log(`Supervisor pay: Base salary for period = ${supervisorBaseSalary}, Worked hours: ${regularHours}, Leave Pay: ${leaveData.leaveAmount}`);
+              console.log(`Supervisor: No overtime, vacation pay, or holiday pay applied`);
+              break;
           }
           
           // Calculate deductions
@@ -979,6 +1002,11 @@ class Payroll {
       
       // Calculate standard daily hours based on employee type and payment frequency
       let standardDailyHours = 8; // Default to 8 hours per day
+      
+      // Supervisors do not receive holiday pay - return zero immediately
+      if (employeeData.employee_type === 'supervisor') {
+        return { holidayHours: 0, holidayPay: 0, holidays: [] };
+      }
       
       // For hourly employees, use standard hours / 5 (weekdays)
       if (employeeData.employee_type === 'hourly' || employeeData.employee_type === 'private_duty_nurse') {

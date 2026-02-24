@@ -2,7 +2,7 @@
 
 ## Overview
 
-The payroll system now supports two distinct employee types with different compensation rules:
+The payroll system supports four distinct employee types with different compensation rules:
 
 1. **Salaried Employees**
    - Paid a flat monthly rate
@@ -13,6 +13,18 @@ The payroll system now supports two distinct employee types with different compe
 2. **Hourly Employees**
    - Paid based on hours worked multiplied by hourly rate
    - Straight pay with no overtime premium
+
+3. **Private Duty Nurse**
+   - Shift-based pay rates (weekday day, weekend day, night)
+   - No overtime calculation
+   - Eligible for vacation, leave, and holiday pay
+
+4. **Supervisor**
+   - Salaried (paid a flat monthly rate like salaried employees)
+   - Does **not** receive overtime pay
+   - Does **not** receive vacation pay
+   - Does **not** receive holiday pay
+   - Sick/maternity leave still applies
 
 ## Technical Implementation
 
@@ -25,7 +37,7 @@ Two migrations have been added:
 
 ### Calculation Logic
 
-The payroll calculation logic now differentiates between salaried and hourly employees:
+The payroll calculation logic differentiates between employee types:
 
 - **Salaried Employees**:
   - Full salary is always paid for the period
@@ -34,6 +46,11 @@ The payroll calculation logic now differentiates between salaried and hourly emp
 - **Hourly Employees**:
   - Pay is calculated as hours worked multiplied by hourly rate
   - No overtime calculation is applied
+
+- **Supervisor**:
+  - Full salary is always paid for the period (same as salaried)
+  - No overtime, vacation pay, or holiday pay
+  - Sick/maternity leave still applies
 
 ### Paystub Display
 
@@ -45,9 +62,10 @@ Paystubs now show a breakdown of:
 
 When creating or updating employees in the system:
 
-1. Set the `employee_type` to either "salary" or "hourly"
-2. For salaried employees, set the `salary_amount` field
+1. Set the `employee_type` to "salary", "hourly", "private_duty_nurse", or "supervisor"
+2. For salaried employees and supervisors, set the `salary_amount` field
 3. For hourly employees, set the `hourly_rate` field
 4. Optionally, adjust the `standard_hours` field (defaults to 40)
+5. Supervisors are salaried but excluded from overtime, vacation pay, and holiday pay
 
 The payroll system will automatically apply the appropriate calculation rules based on the employee type.

@@ -116,11 +116,13 @@ const generatePaystubPDF = async (payrollItem, periodData, options = {}) => {
         empTypeString = 'Salaried';
       } else if (employeeType === 'private_duty_nurse') {
         empTypeString = 'Private Duty Nurse';
+      } else if (employeeType === 'supervisor') {
+        empTypeString = 'Supervisor';
       }
       doc.text(`Employment Type: ${empTypeString}`, col1X, empInfoContentY + 28);
       
       // Right column - reduced vertical spacing
-      if (employeeType === 'salary') {
+      if (employeeType === 'salary' || employeeType === 'supervisor') {
         doc.text(`Monthly Salary: $${parseFloat(salaryAmount || 0).toFixed(2)}`, col2X, empInfoContentY);
       } else if (employeeType === 'private_duty_nurse') {
         // Get private duty nurse rates from payroll settings if available
@@ -187,10 +189,10 @@ const generatePaystubPDF = async (payrollItem, periodData, options = {}) => {
       const grossPay = parseFloat(payrollItem.grossPay || payrollItem.gross_pay || 0).toFixed(2);
       const employeeTypeForEarnings = payrollItem.employee_type || employeeType || '';
       
-      // For salary employees, show the actual monthly salary as regular earnings
+      // For salary/supervisor employees, show the actual monthly salary as regular earnings
       // For hourly/nurse employees, show worked hours pay (gross minus additions)
       let regularEarnings;
-      if (employeeTypeForEarnings === 'salary') {
+      if (employeeTypeForEarnings === 'salary' || employeeTypeForEarnings === 'supervisor') {
         // Use the employee's actual monthly salary from employee details
         regularEarnings = parseFloat(salaryAmount || 0).toFixed(2);
       } else {
@@ -203,12 +205,15 @@ const generatePaystubPDF = async (payrollItem, periodData, options = {}) => {
       
       // Determine earnings description
       const employeeTypeForCalc = payrollItem.employee_type || employeeType;
-      const isHourly = employeeTypeForCalc !== 'salary';
+      const isHourly = employeeTypeForCalc !== 'salary' && employeeTypeForCalc !== 'supervisor';
       const isNurse = employeeTypeForCalc === 'private_duty_nurse';
+      const isSupervisor = employeeTypeForCalc === 'supervisor';
       let calculationDescription;
       
       if (isNurse) {
         calculationDescription = `Private Duty Nurse Pay`;
+      } else if (isSupervisor) {
+        calculationDescription = `Supervisor Salary`;
       } else if (isHourly) {
         calculationDescription = `Hourly Pay`;
       } else {

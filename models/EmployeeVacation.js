@@ -418,6 +418,12 @@ class EmployeeVacation {
         // In a more complex system, you might calculate the actual hours within the pay period
         totalVacationHours += parseFloat(vacation.total_hours);
         
+        // Supervisors do not receive vacation pay
+        if (employeeData.employee_type === 'supervisor') {
+          // Skip vacation pay calculation for supervisors
+          continue;
+        }
+        
         // Calculate vacation pay based on employee type
         if (employeeData.employee_type === 'hourly') {
           // For hourly employees, use the vacation's hourly_rate if specified, 
